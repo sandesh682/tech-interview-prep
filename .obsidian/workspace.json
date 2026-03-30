@@ -11,14 +11,10 @@
             "id": "82f01343b93a3d21",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Node JS/02_Core_Concepts.md",
-                "mode": "preview",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "02_Core_Concepts"
+              "title": "New tab"
             }
           }
         ]
@@ -181,10 +177,21 @@
       "bases:Create new base": false
     }
   },
-  "active": "82f01343b93a3d21",
+  "active": "c0a78ad14044109c",
   "lastOpenFiles": [
-    "Node JS/01_Basics.md",
+    "Node JS/Phase 1 - Foundations.md",
+    "Node JS/Phase 0 - Prerequisites & Mindset.md",
+    "Node JS/Phase 2 - Core Building Blocks.md",
+    "Node JS/09_System_Design_Node.md",
+    "Node JS/08_Database.md",
+    "Node JS/07_Security_Auth.md",
+    "Node JS/06_Scaling_Performance.md",
+    "Node JS/05_Streams_and_FS.md",
+    "Node JS/04_Express_Backend.md",
+    "Node JS/03_Event_Loop_Deep_Dive.md",
+    "Node JS/02_Core_Concepts.md",
     "Node JS/00_Revision_Tracker.md",
+    "Node JS/01_Basics.md",
     "System Design/Phase 0 - Prerequisites & Mindset.md",
     "System Design/Phase 1 - Foundations.md",
     "System Design/Phase 6 - Real-World System Design Cases.md",
@@ -197,19 +204,8 @@
     "Untitled.canvas",
     "System Design/Phase 8 - Interview Strategy & Practice.md",
     "System Design/Phase 2 - Core Building Blocks.md",
-    "Node JS/09_System_Design_Node.md",
     "System Design/System Design Roadmap.md",
     "System Design/Phase 7 - Advanced & Specialized Topics.md",
-    "Node JS/System Design Roadmap.md",
-    "Node JS/Phase 8 - Interview Strategy & Practice.md",
-    "Node JS/Phase 7 - Advanced & Specialized Topics.md",
-    "Node JS/Phase 6 - Real-World System Design Cases.md",
-    "Node JS/Phase 5 - High-Level Design Patterns.md",
-    "Node JS/Phase 4.5 - Critical Components Often Missed.md",
-    "Node JS/Phase 4 - Distributed Systems Concepts.md",
-    "Node JS/Phase 3 - Data & Storage Deep Dive.md",
-    "Node JS/Phase 2.5 - LLD & SOLID Principles.md",
-    "Node JS/Phase 2 - Core Building Blocks.md",
     "System Design",
     "Untitled.base",
     "Node JS"
