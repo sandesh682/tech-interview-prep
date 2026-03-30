@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "e6513ea41fdd0e57",
+        "id": "8d914a7e85875d3b",
         "type": "tabs",
         "children": [
           {
-            "id": "bb949ee171bb8b70",
+            "id": "82f01343b93a3d21",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Node JS/02_Core_Concepts.md",
+                "mode": "preview",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "02_Core_Concepts"
             }
           }
         ]
@@ -90,6 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "System Design/Phase 0 - Prerequisites & Mindset.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks"
+              "title": "Backlinks for Phase 0 - Prerequisites & Mindset"
             }
           },
           {
@@ -176,23 +181,25 @@
       "bases:Create new base": false
     }
   },
-  "active": "bb949ee171bb8b70",
+  "active": "82f01343b93a3d21",
   "lastOpenFiles": [
-    "2026-03-22.md",
-    "Untitled.canvas",
+    "Node JS/01_Basics.md",
+    "Node JS/00_Revision_Tracker.md",
     "System Design/Phase 0 - Prerequisites & Mindset.md",
-    "System Design/Phase 8 - Interview Strategy & Practice.md",
     "System Design/Phase 1 - Foundations.md",
-    "System Design/Phase 3 - Data & Storage Deep Dive.md",
-    "System Design/Phase 2.5 - LLD & SOLID Principles.md",
-    "System Design/Phase 2 - Core Building Blocks.md",
+    "System Design/Phase 6 - Real-World System Design Cases.md",
     "System Design/Phase 5 - High-Level Design Patterns.md",
     "System Design/Phase 4.5 - Critical Components Often Missed.md",
     "System Design/Phase 4 - Distributed Systems Concepts.md",
+    "System Design/Phase 3 - Data & Storage Deep Dive.md",
+    "System Design/Phase 2.5 - LLD & SOLID Principles.md",
+    "2026-03-22.md",
+    "Untitled.canvas",
+    "System Design/Phase 8 - Interview Strategy & Practice.md",
+    "System Design/Phase 2 - Core Building Blocks.md",
     "Node JS/09_System_Design_Node.md",
     "System Design/System Design Roadmap.md",
     "System Design/Phase 7 - Advanced & Specialized Topics.md",
-    "System Design/Phase 6 - Real-World System Design Cases.md",
     "Node JS/System Design Roadmap.md",
     "Node JS/Phase 8 - Interview Strategy & Practice.md",
     "Node JS/Phase 7 - Advanced & Specialized Topics.md",
@@ -203,8 +210,6 @@
     "Node JS/Phase 3 - Data & Storage Deep Dive.md",
     "Node JS/Phase 2.5 - LLD & SOLID Principles.md",
     "Node JS/Phase 2 - Core Building Blocks.md",
-    "Node JS/Phase 1 - Foundations.md",
-    "Node JS/Phase 0 - Prerequisites & Mindset.md",
     "System Design",
     "Untitled.base",
     "Node JS"

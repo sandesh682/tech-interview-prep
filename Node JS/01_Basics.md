@@ -12,11 +12,13 @@
 ## Q1 — What is Node.js and how does it work internally?
 
 ### ✅ Simple Explanation
-Node.js is a JavaScript runtime built on Chrome's V8 engine. It lets you run JavaScript on the server side. It is single-threaded but handles concurrency via a non-blocking I/O model powered by **libuv**.
+Node.js is a JavaScript runtime built on Chrome's V8 engine. 
+It lets you run JavaScript on the server side. 
+It is single-threaded but handles concurrency via a non-blocking I/O model powered by **libuv**.
+libuv provides the event loop, thread pool (default 4 threads), and async I/O
 
 ### 🧠 Deep Dive
 - V8 compiles JS to native machine code
-- libuv provides the event loop, thread pool (default 4 threads), and async I/O
 - Node.js is NOT multi-threaded for JS execution — but it offloads I/O to the OS / thread pool
 - The thread pool handles: DNS, file system, crypto, compression
 
@@ -43,151 +45,1293 @@ console.log('Node version:', process.version);
 
 ## Q2 — CommonJS vs ES Modules — what's the difference?
 
-### ✅ Simple Explanation
-- **CommonJS (CJS)**: `require()` / `module.exports` — synchronous, older standard
-- **ES Modules (ESM)**: `import` / `export` — async, modern standard, tree-shakeable
 
-### 🧠 Deep Dive
-| Feature        | CommonJS          | ES Modules                              |
-| -------------- | ----------------- | --------------------------------------- |
-| Syntax         | `require()`       | `import`                                |
-| Loading        | Synchronous       | Asynchronous                            |
-| Live binding   | No                | Yes (exports are live)                  |
-| File extension | `.js` (default)   | `.mjs` or `"type":"module"`             |
-| `__dirname`    | ✅ Available       | ❌ Not available (use `import.meta.url`) |
-| Tree shaking   | ❌ No              | ✅ Yes                                   |
-| Circular deps  | Handled (partial) | Handled (live bindings)                 |
+# 🔹 1. Module Systems
 
-**Module caching**: Both systems cache modules after first load. `require()` returns the same instance on repeated calls.
+- **CommonJS (CJS)** → `require`, `module.exports`
+    
+- **ES Modules (ESM)** → `import`, `export`
 
-### 💻 Code Example
+---
+
+# 🔹 2. Key Differences
+
+|Feature|CommonJS (`require`)|ES Modules (`import`)|
+|---|---|---|
+|Loading|Synchronous|Static (analyzed before run)|
+|Execution|Runtime|Compile-time|
+|Usage|Anywhere|Top-level only|
+|Export system|Single object|Named + Default|
+|Tree-shaking|❌ No|✅ Yes|
+|Default export|Manual|Native|
+
+---
+
+# 🔹 3. Export Patterns
+
+## ✅ CommonJS
+
 ```js
-// CommonJS
-const express = require('express');
-module.exports = { handler };
+// Named (object)
+module.exports = { add, sub };
 
-// ES Module
-import express from 'express';
-export const handler = () => {};
-
-// ESM __dirname equivalent
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Default
+module.exports = add;
 ```
 
-### ⚠️ Common Mistakes
-- Mixing `require` and `import` in the same file (breaks in Node without babel)
-- Forgetting that ESM files in Node need `"type": "module"` in `package.json` or `.mjs` extension
-- Not knowing that `module.exports` is cached — mutating it doesn't re-run the file
+## ✅ ES Modules
 
-### 🎯 Interview Tip
-> "I prefer ESM for new projects due to tree-shaking and live bindings. CJS is still dominant in existing Node ecosystems."
+```js
+// Named
+export const add = () => {};
+
+// Default
+export default function add() {}
+```
+
+---
+
+# 🔹 4. Import Patterns
+
+## ✅ CommonJS
+
+```js
+const { add } = require('./math');
+const add = require('./math');
+```
+
+## ✅ ES Modules
+
+```js
+import add from './math.js';
+import { add } from './math.js';
+```
+
+---
+
+# 🔥 5. MOST ASKED TRICKY CASES
+
+## ❗ Case 1: require + ES Module default
+
+```js
+// ES Module
+export default function add() {}
+```
+
+```js
+const add = require('./math'); // ❌
+```
+
+👉 Actual:
+
+```js
+{ default: add }
+```
+
+✅ Fix:
+
+```js
+const add = require('./math').default;
+```
+
+---
+
+## ❗ Case 2: import + CommonJS
+
+```js
+// CommonJS
+module.exports = { add };
+```
+
+```js
+import add from './math.js'; // ❌
+```
+
+✅ Fix:
+
+```js
+import { add } from './math.js';
+```
+
+---
+
+## ❗ Case 3: Default + Named
+
+```js
+export const add = () => {};
+export default () => {};
+```
+
+```js
+import multiply, { add } from './math.js'; // ✅
+```
+
+---
+
+## ❗ Case 4: Only ONE default
+
+```js
+export default a;
+export default b; // ❌
+```
+
+---
+
+## ❗ Case 5: Exact name required
+
+```js
+export const add = () => {};
+```
+
+```js
+import { ADD } from './math'; // ❌
+```
+
+---
+
+# 🔹 6. Dynamic Loading
+
+## CommonJS
+
+```js
+const lib = require('./lib');
+```
+
+## ES Modules
+
+```js
+const lib = await import('./lib.js');
+```
+
+---
+
+# 🧠 7. Interview One-Liners
+
+- ES Modules are **static & optimized**
+    
+- CommonJS is **dynamic & runtime-based**
+    
+- CommonJS always exports **one object**
+    
+- `export default` → no `{}`
+    
+- `export const` → use `{}`
+    
+- Mixing both → causes `.default` bugs
+    
+
+---
+
+# 🚀 8. Best Practice
+
+- Use **ES Modules in modern apps**
+    
+- Avoid mixing CJS + ESM
+    
+- Prefer:
+    
+
+```js
+export default
+export const
+import ...
+```
+
+---
+
+# 💣 9. Real Bug Pattern
+
+```js
+const lib = require('./file');
+
+lib.default(); // 😵 unexpected
+```
+
+---
+
+# 🟢 Module Caching: CJS vs ESM
+
+---
+
+## 🔥 CommonJS (CJS) – require()
+
+### 📌 Behavior
+
+- Module is executed **only once**
+    
+- Then stored in cache → `require.cache`
+    
+- Next `require()` returns **same instance**
+    
+
+---
+
+### ✅ Example
+
+```js
+// file.js
+console.log("Loaded");
+module.exports = { count: 0 };
+```
+
+```js
+// app.js
+const a = require('./file');
+const b = require('./file');
+
+console.log(a === b); // true
+```
+
+---
+
+### 🧠 Key Points
+
+- Runs only once
+    
+- Cached after first load
+    
+- Shared state (singleton)
+    
+
+```js
+a.count = 5;
+console.log(b.count); // 5
+```
+
+---
+
+### ⚠️ Cache Control
+
+```js
+delete require.cache[require.resolve('./file')];
+```
+
+---
+
+# 🟢 ES Modules (ESM) – import/export
+
+---
+
+## 📌 Behavior
+
+- Module is also **executed only once**
+    
+- Cached internally (no `require.cache`)
+    
+- Always returns **same instance**
+    
+
+---
+
+### ✅ Example
+
+```js
+// file.js
+console.log("Loaded");
+export const obj = { count: 0 };
+```
+
+```js
+// app.js
+import { obj as a } from './file.js';
+import { obj as b } from './file.js';
+
+console.log(a === b); // true
+```
+
+---
+
+## 🧠 Key Points
+
+- Singleton behavior (same instance)
+    
+- Cached after first evaluation
+    
+- Static imports (top-level only)
+    
+
+---
+
+## 🔥 Important Difference
+
+### Live Bindings (VERY IMPORTANT 💣)
+
+```js
+// file.js
+export let count = 0;
+
+export function inc() {
+  count++;
+}
+```
+
+```js
+// app.js
+import { count, inc } from './file.js';
+
+inc();
+console.log(count); // 1 ✅ (auto-updated)
+```
+
+👉 ESM exports are **live references**
+
+---
+
+## ⚠️ CJS vs ESM Difference
+
+```text
+CJS → value copy (snapshot-like behavior), however as objcets are refernce type, it works for objects
+ESM → live binding (auto updates), if variable is updated in one file, it gets updated where it is imported.
+```
+
+---
+
+## ⚠️ No Manual Cache Access
+
+- No equivalent of `require.cache`
+    
+- Cannot easily force reload
+    
+
+---
+
+# 💣 Interview Points
+
+- Both CJS & ESM:
+    
+    - Execute module only once
+        
+    - Cache result
+        
+- Differences:
+    
+    - CJS → runtime, mutable exports
+        
+    - ESM → compile-time, live bindings
+        
+
+---
+
+# 🚀 Quick Summary
+
+CJS:
+
+- require()
+    
+- cached in require.cache
+    
+- same instance returned
+    
+- can clear cache manually
+    
+
+ESM:
+
+- import/export
+    
+- cached internally
+    
+- same instance returned
+    
+- live bindings (auto updates)
+    
+- no manual cache control
+
+# 🧩 Final Summary
+
+> Use ESM for new projects.  
+> Use CJS only for legacy or compatibility or dynamic loading
 
 ---
 
 ## Q3 — What is `package.json` and what are key fields?
 
-### ✅ Simple Explanation
-`package.json` is the manifest file for a Node project — it defines metadata, dependencies, scripts, and configuration.
+---
 
-### 🧠 Deep Dive
-**Critical fields:**
-- `main`: entry point for CJS
-- `module`: entry point for ESM (used by bundlers)
-- `exports`: modern way to define multiple entry points
-- `dependencies` vs `devDependencies`: production vs dev-only
-- `peerDependencies`: expected to be installed by consumer
-- `engines`: specifies Node.js version compatibility
+# 🔹 1. What is `package.json`?
 
-**Semantic versioning (semver):**
-- `^1.2.3` — allows minor + patch updates (1.x.x)
-- `~1.2.3` — allows only patch updates (1.2.x)
-- `1.2.3` — exact version
+> The **central configuration file** of a Node.js project.
 
-### 💻 Code Example
+👉 Manages:
+
+- Project metadata
+    
+- Dependencies
+    
+- Scripts
+    
+- Module system
+    
+
+---
+
+# 🔹 2. Basic Example
+
 ```json
 {
-  "name": "mern-server",
+  "name": "my-app",
   "version": "1.0.0",
-  "type": "module",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "jest"
+    "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.18.0",
-    "mongoose": "^7.0.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.0",
-    "jest": "^29.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "express": "^4.18.2"
   }
 }
 ```
 
-### ⚠️ Common Mistakes
-- Putting test libraries in `dependencies` instead of `devDependencies`
-- Not locking versions in production (`package-lock.json` or `yarn.lock` must be committed)
+---
 
-### 🎯 Interview Tip
-> "The `exports` field gives fine-grained control over what consumers can import — important for building libraries."
+# 🔥 3. Important Fields
+
+## ✅ `name` & `version`
+
+- Project identity (required for npm publish)
+    
+
+## ✅ `main`
+
+- Entry point of app
+    
+
+## ✅ `type`
+
+- `"module"` → ES Modules (`import`)
+    
+- default → CommonJS (`require`)
+    
+
+## ✅ `scripts`
+
+```bash
+npm run start
+```
+
+## ✅ `dependencies`
+
+- Required in production
+    
+
+## ✅ `devDependencies`
+
+- Only for development
+    
 
 ---
 
-## Q4 — What is the `process` object in Node.js?
+# 🔹 4. What does it do?
 
-### ✅ Simple Explanation
-`process` is a global object that provides information and control over the current Node.js process.
+- Tracks installed packages
+    
+- Enables `npm install`
+    
+- Defines how app runs
+    
+- Controls module system
+    
 
-### 🧠 Deep Dive
-Key properties and methods:
-- `process.env` — environment variables
-- `process.argv` — CLI arguments array (index 0 = node, 1 = script)
-- `process.exit(code)` — terminate process (0 = success, 1 = error)
-- `process.nextTick(cb)` — queue callback before I/O events (see Event Loop file)
-- `process.cwd()` — current working directory
-- `process.memoryUsage()` — heap stats
-- `process.uptime()` — seconds since process started
+---
 
-### 💻 Code Example
+# 🔹 5. package.json vs package-lock.json
+
+|Feature|package.json|package-lock.json|
+|---|---|---|
+|Purpose|Declares dependencies|Locks exact versions|
+|Editable|Yes|No (auto-generated)|
+|Version flexibility|Uses ranges (`^`, `~`)|Exact versions|
+|Created by|Developer / npm init|npm install|
+
+---
+
+# 🔥 6. What is `package-lock.json`?
+
+> Auto-generated file that **locks dependency versions**.
+
+---
+
+## ✅ Why it exists?
+
+👉 Ensures:
+
+- Same versions across all machines
+    
+- No “works on my machine” bugs
+    
+- Faster installs (uses cached tree)
+    
+
+---
+
+## 🔍 Example
+
+```json
+"express": "^4.18.2"
+```
+
+👉 In `package.json` → flexible
+
+```json
+"express": "4.18.2"
+```
+
+👉 In `package-lock.json` → exact
+
+---
+
+## ⚠️ Important Rules
+
+- Always **commit `package-lock.json`**
+    
+- Never edit manually
+    
+- Auto-updated on `npm install`
+    
+
+---
+
+# 🔥 7. Interview Points (High Value)
+
+- `package.json` = **declares what you want**
+    
+- `package-lock.json` = **locks what you get**
+    
+
+---
+
+# 🧠 One-Liner
+
+> `package.json` defines dependencies, while `package-lock.json` ensures consistent installs by locking exact versions.
+
+---
+
+# 🚀 Bonus Commands
+
+```bash
+npm init -y      # create package.json
+npm install      # install deps
+npm install x    # add dependency
+npm install -D x # add dev dependency
+```
+
+---
+
+# 🧩 Final Summary
+
+> package.json = project blueprint  
+> package-lock.json = exact dependency snapshot
+
+---
+
+# 📦 Node.js Version Flexibility (`^`, `~`, exact) — Interview Notes
+
+---
+
+# 🔹 1. Semantic Versioning (SemVer)
+
+Format:
+
+```text
+MAJOR.MINOR.PATCH
+```
+
+Example:
+
+```text
+4.18.2
+```
+
+- **MAJOR** → Breaking changes
+    
+- **MINOR** → New features (backward compatible)
+    
+- **PATCH** → Bug fixes
+    
+
+---
+
+# 🔹 2. Version Symbols in `package.json`
+
+## ✅ Caret (`^`) — Most Common
+
+```json
+"express": "^4.18.2"
+```
+
+👉 Allows:
+
+- Minor + Patch updates (same MAJOR)
+    
+
+### ✅ Allowed:
+
+- 4.18.3
+    
+- 4.19.0
+    
+
+### ❌ Not Allowed:
+
+- 5.0.0
+    
+
+💡 Rule:
+
+> `^` = flexible within same MAJOR
+
+---
+
+## ✅ Tilde (`~`)
+
+```json
+"express": "~4.18.2"
+```
+
+👉 Allows:
+
+- Patch updates only (same MINOR)
+    
+
+### ✅ Allowed:
+
+- 4.18.3
+    
+- 4.18.9
+    
+
+### ❌ Not Allowed:
+
+- 4.19.0
+    
+- 5.0.0
+    
+
+💡 Rule:
+
+> `~` = flexible within same MINOR
+
+---
+
+## ✅ Exact Version
+
+```json
+"express": "4.18.2"
+```
+
+👉 Allows:
+
+- Only exact version
+    
+
+---
+
+# 🔹 3. Comparison Table
+
+|Symbol|Allows Changes|Example Range|
+|---|---|---|
+|`^`|Minor + Patch|4.x.x (not 5.x.x)|
+|`~`|Patch only|4.18.x|
+|none|Exact|4.18.2 only|
+
+---
+
+# 🔹 4. Real-world Behavior
+
+```json
+"express": "^4.18.2"
+```
+
+👉 Different machines may install:
+
+- 4.18.2
+    
+- 4.19.1
+    
+
+✅ Controlled by **package-lock.json**
+
+---
+
+# 🔹 5. Role of `package-lock.json`
+
+- Locks **exact versions**
+    
+- Ensures same install across machines
+    
+- Prevents unexpected updates
+    
+
+💡 Key Idea:
+
+> `package.json` = version range  
+> `package-lock.json` = exact version
+
+---
+
+# 🔥 6. Special Case: Version `0.x.x`
+
+👉 When MAJOR = 0, behavior changes
+
+```json
+"lib": "^0.3.2"
+```
+
+### ❗ Behavior:
+
+- `^` becomes restrictive
+    
+- Only allows patch updates within same minor
+    
+
+### ✅ Allowed:
+
+- 0.3.3
+    
+- 0.3.9
+    
+
+### ❌ Not Allowed:
+
+- 0.4.0
+    
+- 1.0.0
+    
+
+---
+
+## 💡 Why?
+
+> Version `0.x.x` is considered **unstable**, so minor updates may break code.
+
+---
+
+## 🔁 Comparison
+
+|Symbol|Normal (>=1.0.0)|Version 0 Behavior|
+|---|---|---|
+|`^`|Minor + Patch|Patch only within same minor|
+|`~`|Patch only|Patch only (same)|
+
+---
+
+# 🧠 7. Interview One-Liners
+
+- `^` → minor + patch updates
+    
+- `~` → patch updates only
+    
+- exact → strict version
+    
+- `package-lock.json` ensures consistency
+    
+- Version `0` → `^` behaves like `~`
+    
+
+---
+
+# 🚀 8. Best Practice
+
+- Use `^` in most projects
+    
+- Rely on `package-lock.json` for stability
+    
+- Use exact versions for critical systems
+    
+
+---
+
+# 🧩 Final Summary
+
+> `^` = flexible (minor + patch)  
+> `~` = safer (patch only)  
+> exact = strict  
+> version 0 = more restrictive
+
+---
+# 🔹 npm install vs Version Updates (IMPORTANT)
+
+## ❗ Does `npm install` update versions?
+
+👉 **No (by default)**
+
+- Installs from **`package-lock.json`**
+    
+- Ensures same versions across all machines
+    
+
+---
+
+## ✅ When versions DO update
+
+### 1. No `package-lock.json`
+
+```bash
+npm install
+```
+
+👉 Installs latest version within allowed range (`^`, `~`)
+
+---
+
+### 2. Installing a new package
+
+```bash
+npm install lodash
+```
+
+👉 Installs latest version  
+👉 Updates both:
+
+- `package.json`
+    
+- `package-lock.json`
+    
+
+---
+
+### 3. Using update command
+
+```bash
+npm update
+```
+
+👉 Updates packages within allowed range
+
+---
+
+### 4. Force latest version
+
+```bash
+npm install express@latest
+```
+
+👉 Ignores range → installs newest version
+
+---
+
+## 🔥 Summary Table
+
+|Command|Updates Versions?|Uses Lock File?|
+|---|---|---|
+|`npm install`|❌ No (usually)|✅ Yes|
+|`npm update`|✅ Yes|✅ Updates lock|
+|`npm install x`|✅ Yes|✅ Updates both|
+|no lock file|✅ Yes|❌ No|
+
+---
+
+## 🧠 Interview One-Liner
+
+> `npm install` installs from `package-lock.json`, so versions don’t change unless explicitly updated or lock file is missing.
+
+---
+
+## Q4 — Node.js: Global Objects
+
+## 📌 What are Global Objects?
+
+- Available everywhere (no import required)
+    
+- Provided by Node.js runtime
+    
+- Not part of JavaScript (ECMAScript)
+    
+
+---
+
+# 🔥 process Object (VERY IMPORTANT)
+
+## 📌 Definition
+
+- Global object representing the currently running Node.js process
+    
+
+---
+
+## 🔥 Must-Know Properties & Methods
+
+### 1️⃣ process.env
+
+- Environment variables (ALWAYS strings)
+    
+
+process.env.PORT  
+process.env.NODE_ENV
+
+Used for:
+
+- Configs
+    
+- Secrets (API keys, DB URLs)
+    
+
+---
+
+### 2️⃣ process.argv
+
+- Command-line arguments
+    
+
+node app.js hello
+
+process.argv → [nodePath, filePath, "hello"]
+
+Key Points:
+
+- argv[0] → node path
+    
+- argv[1] → file path
+    
+- argv[2+] → user arguments
+    
+
+---
+
+### 3️⃣ process.exit(code)
+
+- Terminates the process
+    
+
+process.exit(0) → exit after success (e.g. task is completed) 
+process.exit(1) → error (uncaughtException)
+
+Important:
+
+- Stops event loop immediately
+    
+
+---
+
+### 4️⃣ process.cwd()
+
+- Current working directory (where app is run)
+    
+
+---
+
+### 5️⃣ process.pid
+
+- Process ID
+    
+
+---
+
+### 6️⃣ process.memoryUsage()
+
+- Memory stats
+    
+
+Returns:
+
+- rss
+    
+- heapTotal
+    
+- heapUsed
+    
+- external
+    
+
+---
+
+## 🔥 Important Events (Interview Gold)
+
+### process.on('exit')
+
+- Runs when process is about to exit
+    
+
+### process.on('uncaughtException')
+
+- Handles uncaught synchronous errors
+    
+
+### process.on('unhandledRejection')
+
+- Handles unhandled Promise rejections (async errors)
+
+# SIGTERM & Graceful Shutdown (Node.js)
+
+---
+
+## 📌 What is SIGTERM?
+
+- A signal sent by the OS to **terminate a process**
+    
+- Default signal used by:
+    
+    - Docker
+        
+    - Kubernetes
+        
+    - `kill` command
+        
+
+---
+
+## 📌 Why Graceful Shutdown?
+
+- Prevent data loss
+    
+- Close resources properly
+    
+- Avoid corrupted state
+    
+
+---
+
+# 🔥 Basic Handling
+
 ```js
-// Read env variable with fallback
-const PORT = process.env.PORT || 3000;
-
-// Parse CLI args
-// node app.js --env production
-const args = process.argv.slice(2);
-console.log(args); // ['--env', 'production']
-
-// Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Closing server...');
-  server.close(() => {
-    process.exit(0);
-  });
-});
-
-// Uncaught exception handler (last resort)
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  process.exit(1); // Always exit after uncaughtException
+  console.log('SIGTERM received');
+  process.exit(0);
 });
 ```
 
-### ⚠️ Common Mistakes
-- Not handling `uncaughtException` — process crashes silently in some setups
-- Using `process.exit()` without closing DB connections first (causes data loss)
-- Accessing `process.env` without dotenv loaded in local dev
+---
 
-### 🎯 Interview Tip
-> "Always set up a SIGTERM handler for graceful shutdown in production — important for Kubernetes deployments."
+# ⚠️ Problem with above
+
+- Immediate exit ❌
+    
+- Does NOT:
+    
+    - close DB
+        
+    - stop server
+        
+    - finish requests
+        
+
+---
+
+# ✅ Graceful Shutdown (Correct Way)
+
+```js
+const server = app.listen(3000);
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received');
+
+  server.close(() => {
+    console.log('HTTP server closed');
+
+    // close DB, queues, etc.
+    process.exit(0);
+  });
+});
+```
+
+---
+
+# 🔥 What to Clean Up
+
+- HTTP server (stop accepting new requests)
+    
+- Database connections
+    
+- Message queues (Kafka, RabbitMQ)
+    
+- File handles
+    
+- Background jobs
+    
+
+---
+
+# 🧠 Flow
+
+SIGTERM received  
+→ stop new requests  
+→ finish ongoing requests  
+→ cleanup resources  
+→ exit process
+
+---
+
+# ⚠️ Important Notes
+
+- `server.close()`:
+    
+    - Stops new connections
+        
+    - Allows existing requests to finish
+        
+- Always add timeout fallback:
+    
+
+```js
+setTimeout(() => {
+  console.error('Force shutdown');
+  process.exit(1);
+}, 10000);
+```
+
+---
+
+# 💣 Interview Points
+
+- SIGTERM ≠ SIGKILL
+    
+    - SIGTERM → graceful (can handle)
+        
+    - SIGKILL → force kill (cannot handle)
+        
+- Used in production environments:
+    
+    - Docker container shutdown
+        
+    - Kubernetes pod termination
+        
+
+---
+
+# 🚀 Full Example
+
+```js
+const server = app.listen(3000);
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+function shutdown() {
+  console.log('Shutting down...');
+
+  server.close(() => {
+    console.log('Closed out remaining connections');
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    console.error('Forcing shutdown');
+    process.exit(1);
+  }, 10000);
+}
+```
+
+---
+
+# 🧠 Quick Summary
+
+SIGTERM → termination signal
+
+Graceful shutdown:
+
+- stop new requests
+    
+- finish ongoing work
+    
+- clean resources
+    
+- exit safely
+    
+
+SIGKILL → cannot be handled
+
+Always:  
+handle SIGTERM + cleanup + timeout fallback
+    
+
+---
+
+## ⚠️ Difference
+
+uncaughtException → synchronous errors (throw)  
+unhandledRejection → async errors (Promise without catch)
+
+---
+
+## 🚨 Production Best Practice
+
+process.on('uncaughtException', (err) => {  
+console.error(err);  
+process.exit(1);  
+});
+
+process.on('unhandledRejection', (err) => {  
+console.error(err);  
+process.exit(1);  
+});
+
+---
+
+## 💣 Why process.exit(1)?
+
+- App is in inconsistent state
+    
+- Memory may be corrupted
+    
+- Connections may be broken
+    
+
+Best approach:  
+Crash → Restart (PM2 / Docker)
+
+---
+
+## 🧠 Golden Rules
+
+- Do NOT use these as primary error handling
+    
+- Use try/catch for sync
+    
+- Use .catch() / async-await for async
+    
+- These are last-resort safety handlers
+    
+
+---
+
+# 🔥 Other Global Objects
+
+## __dirname
+
+- Absolute path of current file’s directory
+    
+
+## __filename
+
+- Absolute path of current file
+    
+
+## global
+
+- Global object in Node.js (like window in browser)
+    
+
+global.test = "hello"  
+console.log(test)
+
+---
+
+## ⚠️ Important Difference
+
+__dirname → file location  
+process.cwd() → execution location
+
+---
+
+# 🚀 Final Quick Summary
+
+process → current running app info & control
+
+process.env → environment variables  
+process.argv → CLI arguments  
+process.exit() → stop process  
+process.cwd() → where app runs  
+process.pid → process ID  
+process.memoryUsage() → memory stats
+
+uncaughtException → sync crash  
+unhandledRejection → async crash
+
+Both → log + exit(1)
+
+__dirname → file directory  
+__filename → file path  
+global → global object
 
 ---
 
@@ -238,47 +1382,165 @@ npm audit fix
 
 ---
 
-## Q6 — What is `__dirname`, `__filename`, and `require.resolve`?
+## Q6 — What is __dirname, __filename, path.join, require.resolve?
 
-### ✅ Simple Explanation
-- `__dirname` — absolute path of the current file's directory
-- `__filename` — absolute path of the current file
-- `require.resolve()` — returns the resolved path of a module without loading it
+---
 
-### 🧠 Deep Dive
-These are CommonJS-specific globals. In ESM, you must reconstruct them:
+## 📌 Overview
 
-```js
-// ESM equivalent
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+- Provided by Node.js runtime (not part of JavaScript)
+    
+- Used for file paths & module resolution
+    
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-```
+---
 
-`require.resolve` is useful for checking if a module exists before requiring it.
+# 🔥 __dirname
 
-### 💻 Code Example
-```js
-// CJS — build paths relative to current file
-const path = require('path');
-const configPath = path.join(__dirname, '..', 'config', 'db.js');
+## 📌 Definition
 
-// Check if module exists
-try {
-  require.resolve('some-optional-package');
-  const pkg = require('some-optional-package');
-} catch {
-  console.log('Optional package not installed');
-}
-```
+- Absolute path of current file’s directory
+    
 
-### ⚠️ Common Mistakes
-- Using relative paths like `./config/db.js` instead of `path.join(__dirname, ...)` — breaks when script is run from a different working directory
+console.log(__dirname)
 
-### 🎯 Interview Tip
-> "Always use `path.join(__dirname, ...)` for file paths in Node — never hardcode paths with `/` or rely on `process.cwd()`."
+### 🧠 Key Point
+
+- Represents file location (NOT execution location)
+    
+
+---
+
+# 🔥 __filename
+
+## 📌 Definition
+
+- Absolute path of current file
+    
+
+console.log(__filename)
+
+---
+
+# 🔥 path.join()
+
+## 📌 Definition
+
+- Safely joins multiple path segments
+    
+- From built-in `path` module
+    
+
+const path = require('path')  
+path.join(__dirname, 'folder', 'file.txt')
+
+---
+
+## ✅ Why use it?
+
+- Handles OS differences (`/` vs `\`)
+    
+- Removes duplicate slashes
+    
+- Creates clean paths
+    
+
+---
+
+## ⚠️ Avoid this
+
+__dirname + "/folder/file.txt"
+
+---
+
+# 🔥 require.resolve()
+
+## 📌 Definition
+
+- Returns the **absolute path of a module/file without executing it**
+    
+
+require.resolve('./file')
+
+---
+
+## ✅ Example
+
+const path = require('path')
+
+console.log(require.resolve('./index.js'))
+
+// Output:  
+// /users/sandesh/app/index.js
+
+---
+
+## 🔥 Use Cases
+
+### 1️⃣ Check if module exists
+
+require.resolve('express')
+
+---
+
+### 2️⃣ Get actual file path
+
+const filePath = require.resolve('./config.json')
+
+---
+
+### 3️⃣ Debug module resolution
+
+- Helps understand where Node is loading module from
+    
+
+---
+
+## ⚠️ Important
+
+- Does NOT import the module
+    
+- Only resolves path
+    
+- Throws error if module not found
+    
+
+---
+
+# ⚠️ Key Differences
+
+__dirname → current file directory  
+__filename → current file path  
+path.join() → safely build paths  
+require.resolve() → get resolved module path
+
+---
+
+# 💣 Interview Points
+
+- __dirname ≠ process.cwd()
+    
+- __dirname → file location
+    
+- cwd() → execution location
+    
+- require.resolve follows Node module resolution:
+    
+    1. Local file
+        
+    2. node_modules
+        
+    3. Global paths
+        
+
+---
+
+# 🚀 Quick Summary
+
+__dirname → folder path  
+__filename → file path  
+path.join() → safe path builder  
+require.resolve() → find exact file path (no execution)
 
 ---
 

@@ -95,20 +95,104 @@ This is a non-negotiable senior-level skill. Interviewers use it to test whether
 
 Memorise these. They appear in almost every estimation:
 
-| Metric | Value |
-|--------|-------|
-| 1 day in seconds | ~86,400 |
-| 1 month in seconds | ~2.5M |
-| 1 year in seconds | ~31.5M |
-| Latency: L1 cache | ~1 ns |
-| Latency: RAM read | ~100 ns |
-| Latency: SSD random read | ~100 µs |
-| Latency: HDD random read | ~10 ms |
-| Latency: Network round-trip (same DC) | ~0.5 ms |
-| Latency: Network round-trip (cross-region) | ~150 ms |
-| Average HTTP request payload | ~1–10 KB |
-| Average image | ~300 KB |
-| Average video (1 min, compressed) | ~10 MB |
+| Metric                                     | Value    |     |
+| ------------------------------------------ | -------- | --- |
+| 1 day in seconds                           | ~86,400  |     |
+| 1 month in seconds                         | ~2.5M    |     |
+| 1 year in seconds                          | ~31.5M   |     |
+| Latency: L1 cache                          | ~1 ns    |     |
+| Latency: RAM read                          | ~100 ns  |     |
+| Latency: SSD random read                   | ~100 µs  |     |
+| Latency: HDD random read                   | ~10 ms   |     |
+| Latency: Network round-trip (same DC)      | ~0.5 ms  |     |
+| Latency: Network round-trip (cross-region) | ~150 ms  |     |
+| Average HTTP request payload               | ~1–10 KB |     |
+| Average image                              | ~300 KB  |     |
+| Average video (1 min, compressed)          | ~10 MB   |     |
+
+# 🧠 BOTE - Numbers & Storage Cheat Sheet
+
+---
+
+## 🔢 Number Scale
+
+| Name      | Value              | Power of 10 | Shortcut |
+|-----------|--------------------|-------------|----------|
+| Thousand  | 1,000              | 10^3        | 1K       |
+| Million   | 1,000,000          | 10^6        | 1M       |
+| Billion   | 1,000,000,000      | 10^9        | 1B       |
+| Trillion  | 1,000,000,000,000  | 10^12       | 1T       |
+
+---
+
+## 💾 Storage Units
+
+| Unit | Full Form  | Bytes        | Power |
+|------|-----------|-------------|-------|
+| B    | Byte      | 1           | 10^0  |
+| KB   | Kilobyte  | 1,000       | 10^3  |
+| MB   | Megabyte  | 1,000,000   | 10^6  |
+| GB   | Gigabyte  | 1,000,000,000 | 10^9  |
+| TB   | Terabyte  | 10^12       | 10^12 |
+| PB   | Petabyte  | 10^15       | 10^15 |
+| EB   | Exabyte   | 10^18       | 10^18 |
+
+---
+
+## ⚡ Golden BOTE Shortcuts
+
+- 1 KB  ≈ 10^3 bytes  
+- 1 MB  ≈ 10^6 bytes  
+- 1 GB  ≈ 10^9 bytes  
+
+---
+
+## 🚀 Must-Remember Patterns
+
+- 1M × 1KB ≈ 1GB  
+- 1B × 1KB ≈ 1TB  
+- 1M × 1MB ≈ 1TB  
+
+---
+
+## 🔄 Conversion Rules
+
+- Each step up   → ÷1000  
+- Each step down → ×1000  
+
+### Examples:
+- 1000 MB = 1 GB  
+- 5000 MB = 5 GB  
+- 1 GB = 1000 MB  
+
+---
+
+## 🧩 Combined Thinking (Most Important)
+
+| Users | Per User Data | Total |
+|------|--------------|-------|
+| 1M   | 1 KB         | 1 GB  |
+| 10M  | 1 KB         | 10 GB |
+| 1M   | 1 MB         | 1 TB  |
+| 100M | 10 KB        | 1 TB  |
+
+---
+
+## 🎯 Mental Model (Interview Trick)
+
+Million (10^6) + KB (10^3) = GB (10^9)
+
+👉 Just add exponents
+
+---
+
+## ⚠️ Important Notes
+
+- Use base 10 (not 1024) for interviews  
+- Focus on approximation, not exact values  
+- Speed > accuracy in BOTE  
+
+---
 
 > [!NOTE]
 > These numbers are approximations. The goal isn't precision — it's **order of magnitude** accuracy.
@@ -126,6 +210,169 @@ In system design, a **tradeoff** is the idea that improving one quality of a sys
 | Simplicity vs Flexibility | Monolith | Microservices |
 | Cost vs Performance | Commodity hardware + sharding | High-end hardware |
 | Read vs Write optimization | Denormalized, cached reads | Normalized writes |
+
+# ⚖️ System Design - Trade-offs Cheat Sheet
+
+---
+
+## 🧠 Core Principle
+
+> Every system design decision = Trade-off
+
+You are ALWAYS optimizing for something and sacrificing something else.
+
+---
+
+## ⚖️ 1. CAP Theorem
+
+| Choice | Meaning | You Sacrifice |
+|------|--------|-------------|
+| CP   | Consistency + Partition Tolerance | Availability |
+| AP   | Availability + Partition Tolerance | Consistency |
+| CA   | Consistency + Availability | Not realistic in distributed systems |
+
+### Quick Intuition:
+- Banking → CP (correctness matters)
+- Social Media → AP (availability matters)
+
+---
+
+## ⚡ 2. Consistency vs Availability
+
+| Consistency | Availability |
+|------------|-------------|
+| Same data everywhere | System always responds |
+| Slower | Faster |
+| Safer | Better UX |
+
+👉 Trade-off:
+- Strong consistency → delays
+- Eventual consistency → stale data
+
+---
+
+## 🚀 3. Latency vs Throughput
+
+| Latency | Throughput |
+|--------|-----------|
+| Time per request | Requests per second |
+| Low = fast response | High = handles more load |
+
+👉 Trade-off:
+- Batch processing → high throughput, high latency  
+- Real-time → low latency, lower throughput  
+
+---
+
+## 💾 4. Storage vs Computation
+
+| Storage Heavy | Compute Heavy |
+|--------------|--------------|
+| Precompute data | Compute on demand |
+| Fast reads | Less storage |
+| More space | More CPU |
+
+👉 Example:
+- Caching → more storage, less computation
+
+---
+
+## 🧩 5. Read vs Write Optimization
+
+| Read Optimized | Write Optimized |
+|---------------|----------------|
+| Faster reads | Faster writes |
+| Denormalized | Normalized |
+| More duplication | Less duplication |
+
+👉 Example:
+- News Feed → Read heavy  
+- Logging system → Write heavy  
+
+---
+
+## 🔁 6. Sync vs Async Processing
+
+| Sync | Async |
+|-----|------|
+| Immediate response | Background processing |
+| Slower | Faster response |
+| Reliable | Eventually consistent |
+
+👉 Example:
+- Payment → Sync  
+- Email sending → Async  
+
+---
+
+## 📦 7. SQL vs NoSQL
+
+| SQL | NoSQL |
+|----|------|
+| Strong consistency | Flexible schema |
+| Joins | No joins |
+| Vertical scaling | Horizontal scaling |
+
+👉 Trade-off:
+- SQL → correctness  
+- NoSQL → scalability  
+
+---
+
+## ⚡ 8. Caching Trade-offs
+
+| Benefit | Cost |
+|--------|------|
+| Faster reads | Stale data |
+| Reduced DB load | Cache invalidation complexity |
+
+👉 Hardest problem:
+> Cache invalidation 😄
+
+---
+
+## 🌍 9. Horizontal vs Vertical Scaling
+
+| Vertical | Horizontal |
+|---------|-----------|
+| Bigger machine | More machines |
+| Easy | Complex |
+| Limited | Scalable |
+
+---
+
+## 🔐 10. Security vs Performance
+
+| Secure | Fast |
+|-------|------|
+| Encryption | Less overhead |
+| Authentication | Lower latency |
+
+---
+
+## 🎯 Interview Strategy
+
+When asked "Why this design?"
+
+👉 Always answer like this:
+
+1. "We choose X because..."
+2. "We sacrifice Y..."
+3. "This is acceptable because..."
+
+---
+
+## 💡 Example Answer
+
+"We use caching to reduce latency, sacrificing some consistency.  
+This is acceptable because slight staleness is fine for this use case."
+
+---
+
+## 🧠 Golden Rule
+
+> If you are NOT talking about trade-offs, you are NOT doing system design.
+
 
 > [!TIP]
 > When you make a choice, always say: *"I'm choosing X over Y because of [reason]. The trade-off I'm accepting is [downside]."* This is what makes you sound senior.
@@ -145,9 +392,9 @@ In system design, a **tradeoff** is the idea that improving one quality of a sys
 
 ## ✅ Progress Tracker
 
-- [ ] Understand what interviewers evaluate at Senior SDE level
-- [ ] Learn and internalize the RESHADED (or similar) framework
-- [ ] Practice 3 back-of-envelope estimations from scratch
+- [x] Understand what interviewers evaluate at Senior SDE level
+- [x] Learn and internalize the RESHADED (or similar) framework
+- [x] Practice 3 back-of-envelope estimations from scratch
 - [ ] Memorise the key latency + scale numbers
 - [ ] Articulate 5 trade-offs with justification (write them down)
 - [ ] Read one engineering blog post end-to-end (Uber, Netflix, etc.)
