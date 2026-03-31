@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "8d914a7e85875d3b",
+        "id": "f280c38809f90aa7",
         "type": "tabs",
         "children": [
           {
-            "id": "82f01343b93a3d21",
+            "id": "3a4d892c60ed58f6",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Node JS/03_Event_Loop_Deep_Dive.md",
+                "mode": "preview",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "03_Event_Loop_Deep_Dive"
             }
           }
         ]
@@ -177,21 +181,24 @@
       "bases:Create new base": false
     }
   },
-  "active": "c0a78ad14044109c",
+  "active": "3a4d892c60ed58f6",
   "lastOpenFiles": [
-    "Node JS/Phase 1 - Foundations.md",
-    "Node JS/Phase 0 - Prerequisites & Mindset.md",
-    "Node JS/Phase 2 - Core Building Blocks.md",
+    "Node JS/images/event_loop.png",
+    "Node JS/03_Event_Loop_Deep_Dive.md",
+    "Node JS/images",
+    "Node JS/02_Core_Concepts.md",
+    "05 — Promises and Async Await Internals.md",
+    "Node JS/01_Basics.md",
+    "Node JS/00_Revision_Tracker.md",
     "Node JS/09_System_Design_Node.md",
+    "Node JS/Phase 0 - Prerequisites & Mindset.md",
+    "Node JS/Phase 1 - Foundations.md",
+    "Node JS/Phase 2 - Core Building Blocks.md",
     "Node JS/08_Database.md",
     "Node JS/07_Security_Auth.md",
     "Node JS/06_Scaling_Performance.md",
     "Node JS/05_Streams_and_FS.md",
     "Node JS/04_Express_Backend.md",
-    "Node JS/03_Event_Loop_Deep_Dive.md",
-    "Node JS/02_Core_Concepts.md",
-    "Node JS/00_Revision_Tracker.md",
-    "Node JS/01_Basics.md",
     "System Design/Phase 0 - Prerequisites & Mindset.md",
     "System Design/Phase 1 - Foundations.md",
     "System Design/Phase 6 - Real-World System Design Cases.md",
@@ -204,8 +211,6 @@
     "Untitled.canvas",
     "System Design/Phase 8 - Interview Strategy & Practice.md",
     "System Design/Phase 2 - Core Building Blocks.md",
-    "System Design/System Design Roadmap.md",
-    "System Design/Phase 7 - Advanced & Specialized Topics.md",
     "System Design",
     "Untitled.base",
     "Node JS"
