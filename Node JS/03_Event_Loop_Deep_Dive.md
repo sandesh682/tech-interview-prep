@@ -1482,138 +1482,1084 @@ SI2 — nested
 
 ## Q3 — What is libuv and what is the thread pool?
 
-### ✅ Simple Explanation
-`libuv` is the C library that powers Node.js's event loop. It also provides a thread pool for handling operations that can't be done asynchronously by the OS.
+## 🧠 Definition
 
-### 🧠 Deep Dive
-**What libuv handles:**
-- Event loop coordination
-- Thread pool (default: 4 threads, max 1024)
-- Async network I/O (via OS: `epoll` on Linux, `kqueue` on macOS)
-- Async file I/O, DNS, crypto
-
-**Thread pool is used for:**
-- `fs` module (file operations)
-- `crypto` (hashing, pbkdf2, randomBytes for large ops)
-- `dns.lookup()` (but NOT `dns.resolve()`)
-- `zlib` (compression)
-- `http.request` (DNS resolution part)
-
-**Network I/O does NOT use thread pool** — it uses OS-level async (epoll/kqueue).
-
-### 💻 Code Example
-```js
-// Increase thread pool size (before any I/O)
-process.env.UV_THREADPOOL_SIZE = 16; // set in code or as env var
-
-// Example: 4 concurrent crypto operations
-// With default pool size = 4, these run in parallel
-// The 5th would queue until one finishes
-const crypto = require('crypto');
-function hashPassword(password) {
-  return new Promise((resolve, reject) => {
-    crypto.pbkdf2(password, 'salt', 100000, 64, 'sha512', (err, key) => {
-      if (err) reject(err);
-      else resolve(key.toString('hex'));
-    });
-  });
-}
-
-// Benchmark: increasing UV_THREADPOOL_SIZE helps when you have
-// many concurrent CPU-bound async ops (crypto, zlib)
-console.time('4 hashes');
-await Promise.all([
-  hashPassword('pass1'),
-  hashPassword('pass2'),
-  hashPassword('pass3'),
-  hashPassword('pass4'),
-]);
-console.timeEnd('4 hashes');
-```
-
-### ⚠️ Common Mistakes
-- Thinking ALL async operations use the thread pool — network I/O doesn't
-- Not knowing that `dns.lookup()` uses thread pool (synchronous under the hood in libuv) but `dns.resolve()` is truly async
-
-### 🎯 Interview Tip
-> "Node.js is non-blocking for network I/O (handled by OS), but it uses libuv's thread pool for file I/O and crypto. The default pool size is 4 — increasing it helps for CPU-bound async tasks like bcrypt hashing."
+- libuv = C library that powers Node.js async behavior
+    
+- Provides:
+    
+    - Event Loop
+        
+    - Async I/O
+        
+    - Thread Pool
+        
+- Enables non-blocking execution in single-threaded JS
+    
 
 ---
 
-## Q4 — What blocks the event loop and how do you fix it?
+## 🎯 Core Idea
 
-### ✅ Simple Explanation
-The event loop is blocked when a synchronous operation takes too long — no other callbacks can run during this time. This tanks throughput in production.
+Node.js is single-threaded, but libuv offloads work to keep it scalable.
 
-### 🧠 Deep Dive
-**Common blocking operations:**
-- `JSON.parse/stringify` on very large objects
-- Regex with catastrophic backtracking
-- `fs.readFileSync`, `fs.writeFileSync`
-- Synchronous crypto operations
-- Long-running loops
+---
 
-**Detection tools:**
-- `--inspect` + Chrome DevTools
-- `blocked-at` npm package
-- `clinic.js` (flamegraph, bubbleprof)
-- `perf_hooks` for measuring latency
+## ⚙️ Execution Model
 
-**Fix strategies:**
-1. Use async equivalents (`fs.readFile` instead of `fs.readFileSync`)
-2. Break up heavy computation with `setImmediate` (yield control)
-3. Move CPU work to `worker_threads`
-4. Use streaming for large data
+JS Code  
+↓  
+libuv  
+↓  
+Decision:
 
-### 💻 Code Example
+- OS Async (Networking)
+    
+- Thread Pool (FS, DNS, Crypto)  
+    ↓  
+    Event Loop  
+    ↓  
+    Callback Execution
+    
+
+---
+
+## ⚖️ Two Strategies
+
+### OS-level Async (Preferred)
+
+- Uses: epoll (Linux), kqueue (macOS), IOCP (Windows)
+    
+- Used for: HTTP, TCP, sockets
+    
+- No threads involved
+    
+- Highly scalable
+    
+
+### Thread Pool (Fallback)
+
+- Default size = 4
+    
+- Used for:
+    
+    - File System (fs)
+        
+    - DNS (dns.lookup)
+        
+    - Crypto (pbkdf2, bcrypt)
+        
+- Simulates async behavior using threads
+    
+
+---
+
+## 📊 Operations Mapping
+
+- HTTP → OS Async
+    
+- File System → Thread Pool
+    
+- DNS → Thread Pool
+    
+- Crypto → Thread Pool
+    
+
+---
+
+## 🔄 Event Loop (High-level)
+
+Timers → I/O → Poll → Check → Close
+
+Executes callbacks after async work completes
+
+---
+
+## 🧠 Key Insight
+
+OS Async > Thread Pool
+
+Thread pool is fallback, not primary mechanism
+
+---
+
+## 🚫 Why not OS async for everything?
+
+- File systems are blocking
+    
+- DNS uses blocking system calls
+    
+- Crypto is CPU-bound
+    
+- Cross-platform inconsistencies
+    
+
+---
+
+## ⚠️ Interview Traps
+
+- “All async uses thread pool” → Wrong
+    
+- “Node.js has no threads” → Wrong
+    
+- “libuv = only event loop” → Wrong
+    
+- “Async always means OS-level non-blocking” → Wrong
+    
+
+---
+
+## 🚀 One-line Summary
+
+libuv enables Node.js non-blocking behavior using event loop + OS async + thread pool
+
+---
+## Q4 — What is thread pool in node.js?
+
+## 🧠 Definition
+
+- Thread pool = set of worker threads managed by libuv
+    
+- Used to execute blocking or CPU-heavy tasks in background
+    
+- Keeps event loop non-blocking
+    
+- Default size = 4
+    
+
+---
+
+## 🎯 Core Idea
+
+Thread pool provides **concurrency across multiple tasks**, not parallelism for a single task
+
+---
+
+## ⚙️ How It Works
+
+JS Code  
+↓  
+libuv  
+↓  
+Task Queue (FIFO)  
+↓  
+Thread Pool (4 threads)  
+↓  
+Execution  
+↓  
+Event Loop  
+↓  
+Callback Execution
+
+---
+
+## 📊 Execution Model
+
+- Each task is assigned to **one thread only**
+    
+- Tasks are **NOT split across multiple threads**
+    
+
+Example:
+
+1 task → 1 thread  
+4 tasks → 4 threads  
+10 tasks → 4 threads + 6 queued
+
+---
+
+## 🔄 Visual Model
+
+Thread Pool (4 threads)
+
+Thread 1 → Task  
+Thread 2 → Task  
+Thread 3 → Task  
+Thread 4 → Task
+
+Remaining tasks wait in queue
+
+---
+
+## 📦 What Uses Thread Pool
+
+- File System (fs)
+    
+- Crypto (pbkdf2, bcrypt)
+    
+- DNS (dns.lookup)
+    
+- Compression (zlib)
+    
+
+---
+
+## ❌ What Does NOT Use Thread Pool
+
+- HTTP / Network calls
+    
+- Database calls
+    
+- setTimeout / setImmediate
+    
+
+(Handled by OS async)
+
+---
+
+## ⚠️ Critical Behaviors
+
+### Limited Parallelism
+
+- Only N threads run in parallel (default 4)
+    
+- बाकी tasks wait in queue
+    
+
+---
+
+### FIFO Queue
+
+- Tasks executed in order of arrival
+    
+- No priority system
+    
+
+---
+
+### Blocking per Thread
+
+- One slow task blocks one thread
+    
+- Reduces available capacity
+    
+
+---
+
+### Global Resource
+
+- Shared across entire Node.js process
+    
+- All modules compete for same threads
+    
+
+---
+
+## 🔥 Important Insight
+
+Thread pool improves **throughput**, not **latency of a single task**
+
+- 1 heavy task → uses only 1 thread
+    
+- Remaining threads stay idle
+    
+
+---
+
+## ⚠️ Real-world Problem
+
+100 bcrypt requests:
+
+- 4 processed
+    
+- 96 waiting
+    
+- Increased response time
+    
+
+This is called **thread pool saturation**
+
+---
+
+## ⚙️ Configuration
+
+UV_THREADPOOL_SIZE=8 node app.js
+
+---
+
+## 🧠 When to Increase
+
+- Heavy file operations
+    
+- Crypto-heavy workloads
+    
+- Compression tasks
+    
+
+---
+
+## ❌ Why Not Too Many Threads
+
+- CPU contention
+    
+- Context switching overhead
+    
+- Memory usage increase
+    
+- Performance degradation
+    
+
+---
+
+## 🔄 Context Switching
+
+- CPU switches between threads
+    
+- Each switch adds overhead
+    
+- Too many threads → slower system
+    
+
+---
+
+## ⚖️ Thread Pool vs Worker Threads
+
+Thread Pool:
+
+- For I/O + small CPU tasks
+    
+- Limited scaling
+    
+
+Worker Threads:
+
+- For heavy CPU tasks
+    
+- True parallelism
+    
+
+---
+
+## ⚠️ Interview Traps
+
+- “All async uses thread pool” → Wrong
+    
+- “Increasing threads always improves performance” → Wrong
+    
+- “Thread pool splits one task across threads” → Wrong
+    
+- “Each request gets its own thread” → Wrong
+    
+
+---
+
+## 🚀 One-line Summary
+
+Thread pool executes blocking tasks in background using limited threads while keeping event loop non-blocking
+
+---
+
+## 🎯 Interview Answer
+
+Node.js uses libuv’s thread pool (default size 4) to handle blocking operations like file system, DNS, and crypto tasks, ensuring the event loop remains non-blocking.
+
+---
+## Q6 — How are different asynchronous callbacks like timers, I/O, promises, setImmediate, and close events scheduled and executed in Node.js?
+
+## 🧠 Core Idea
+
+- Event loop executes **callbacks**, not the actual work
+    
+- Work may be done by:
+    
+    - OS async (network)
+        
+    - Thread pool (fs, dns, crypto)
+        
+    - Or internally (timers, promises)
+        
+
+---
+
+## ⚙️ Event Loop Flow (Simplified)
+
+Microtasks (Promises)  
+↓  
+Timers (setTimeout / setInterval)  
+↓  
+I/O Callbacks  
+↓  
+Check Phase (setImmediate)  
+↓  
+Close Callbacks
+
+---
+
+## 🔮 Promises (Microtasks)
+
+- Handled by **V8 microtask queue**
+    
+- Runs:
+    
+    - After current execution
+        
+    - Before next event loop phase
+        
+
+👉 Highest priority
+
+---
+
+## ⏱️ Timers (setTimeout / setInterval)
+
+- Registered in **libuv timer queue**
+    
+- Uses system clock (no thread, no OS async I/O)
+    
+- When time expires → callback queued in **timers phase**
+    
+
+---
+
+## 📥 I/O Callbacks Phase
+
+- Executes callbacks of completed I/O
+    
+
+### Two sources:
+
+1. OS Async (network)
+    
+    - epoll / kqueue / IOCP
+        
+    - No thread pool
+        
+2. Thread Pool (fs, dns, crypto)
+    
+    - Work done in background threads
+        
+
+👉 Important:  
+I/O phase runs callbacks, not the work itself
+
+---
+
+## ⚡ setImmediate (Check Phase)
+
+- Scheduled in **check phase**
+    
+- Runs after I/O phase
+    
+
+---
+
+## ❌ Close Callbacks
+
+- Runs when resources are closed
+    
+
+Example:
+
+- socket.on('close', ...)
+    
+
+---
+
+## 🔄 How Callbacks Reach Event Loop
+
+### OS Async (Network)
+
+JS → libuv → OS → Event Loop → I/O Phase → Callback
+
+---
+
+### Thread Pool (fs, crypto)
+
+JS → libuv → Thread Pool → Event Loop → I/O Phase → Callback
+
+---
+
+### Timers
+
+JS → libuv (timer queue) → Timer expires → Timers Phase
+
+---
+
+### Promises
+
+JS → V8 microtask queue → Executed immediately after current code
+
+---
+
+### setImmediate
+
+JS → libuv → Check Phase
+
+---
+
+### Close
+
+Resource closes → Close Phase
+
+---
+
+## ⚠️ Key Insights
+
+- Event loop executes **callbacks only**
+    
+- Not all async operations use thread pool
+    
+- Promises run before timers
+    
+- I/O phase depends on source (OS or thread pool)
+    
+
+---
+
+## ⚠️ Interview Traps
+
+- “All async goes through thread pool” → Wrong
+    
+- “setTimeout uses threads” → Wrong
+    
+- “Promises use libuv” → Wrong (handled by V8)
+    
+- “I/O phase means thread pool” → Wrong
+    
+
+---
+
+## 🚀 One-line Summary
+
+Event loop schedules and executes callbacks from multiple sources: microtasks (promises), timers, I/O (OS or thread pool), setImmediate, and close events.
+
+---
+
+## 🎯 Interview Answer
+
+Promises are handled by the microtask queue (V8), timers by libuv’s timer queue, I/O callbacks come from either OS async or thread pool, setImmediate runs in the check phase, and close callbacks run when resources are cleaned up.
+
+---
+## Q5 — What blocks the event loop and how do you fix it?
+
+
+Event loop is **blocked when synchronous code runs too long**, preventing:
+
+- I/O callbacks
+    
+- timers
+    
+- promises  
+    from executing on time.
+    
+
+👉 Node.js is **single-threaded (main thread)** → if blocked = app becomes unresponsive.
+
+---
+
+## 🔴 1. CPU-Intensive / Heavy Computation
+
+### ❌ Problem
+
 ```js
-// ❌ Blocks event loop for large arrays
-function findPrime(max) {
-  // ... heavy computation, blocks for seconds
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
 }
-app.get('/prime', (req, res) => {
-  const result = findPrime(10000000); // BAD
-  res.json({ result });
-});
+fibonacci(45); // blocks event loop for seconds
+```
 
-// ✅ Yield control with setImmediate (chunked processing)
-async function processChunked(items, chunkSize = 1000) {
-  const results = [];
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    results.push(...chunk.map(processItem));
-    await new Promise(resolve => setImmediate(resolve)); // yield to event loop
+### ✅ Fix 1 — Worker Threads (true parallelism)
+
+```js
+const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
+
+if (isMainThread) {
+  const worker = new Worker(__filename, { workerData: { n: 45 } });
+
+  worker.on('message', result => console.log('Result:', result));
+  worker.on('error', err => console.error(err));
+} else {
+  function fibonacci(n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
   }
-  return results;
+
+  parentPort.postMessage(fibonacci(workerData.n));
 }
+```
 
-// ✅ Use worker_threads for CPU-heavy work
-const { Worker } = require('worker_threads');
-app.get('/prime', (req, res) => {
-  const worker = new Worker('./prime-worker.js', {
-    workerData: { max: 10000000 }
-  });
-  worker.on('message', result => res.json({ result }));
-  worker.on('error', err => res.status(500).json({ error: err.message }));
+### ✅ Fix 2 — Chunking (yield control)
+
+```js
+function fibChunked(n, cb) {
+  function step(a, b, count) {
+    if (count === 0) return cb(a);
+    setImmediate(() => step(b, a + b, count - 1));
+  }
+  step(0, 1, n);
+}
+```
+
+---
+
+## 🔴 2. Synchronous File System Calls
+
+### ❌ Problem
+
+```js
+const fs = require('fs');
+
+const data = fs.readFileSync('/large-file.csv', 'utf8'); // blocks
+processData(data);
+```
+
+### ✅ Fix
+
+```js
+fs.readFile('/large-file.csv', 'utf8', (err, data) => {
+  if (err) throw err;
+  processData(data);
 });
+```
 
-// Measure event loop lag
-const { monitorEventLoopDelay } = require('perf_hooks');
-const h = monitorEventLoopDelay({ resolution: 20 });
-h.enable();
+### ✅ Async/Await
+
+```js
+const { readFile } = require('fs/promises');
+
+const data = await readFile('/large-file.csv', 'utf8');
+processData(data);
+```
+
+---
+
+## 🔴 3. Synchronous Crypto / Hashing
+
+### ❌ Problem
+
+```js
+const crypto = require('crypto');
+
+const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512'); // blocks
+```
+
+### ✅ Fix (libuv thread pool)
+
+```js
+crypto.pbkdf2(password, salt, 100000, 64, 'sha512', (err, hash) => {
+  console.log(hash.toString('hex'));
+});
+```
+
+### ✅ Promisified
+
+```js
+const { promisify } = require('util');
+const pbkdf2 = promisify(crypto.pbkdf2);
+
+const hash = await pbkdf2(password, salt, 100000, 64, 'sha512');
+```
+
+---
+
+## 🔴 4. Large JSON Parsing
+
+### ❌ Problem
+
+```js
+const data = JSON.parse(hugeJsonString); // blocks (sync)
+```
+
+### ✅ Fixes
+
+- Stream parsing
+    
+
+```js
+const { parser } = require('stream-json');
+fs.createReadStream('huge.json').pipe(parser());
+```
+
+- Worker threads
+    
+- Paginate data at DB level
+    
+
+---
+
+## 🔴 5. process.nextTick / Promise Starvation
+
+### ❌ Problem (starvation)
+
+```js
+function recursiveNextTick() {
+  process.nextTick(recursiveNextTick);
+}
+recursiveNextTick(); // blocks I/O forever
+```
+
+### ✅ Fix
+
+```js
+function recursiveImmediate() {
+  setImmediate(recursiveImmediate);
+}
+```
+
+👉 `process.nextTick` runs **before event loop phases**  
+👉 `setImmediate` allows loop to continue (poll phase)
+
+---
+
+## 🔴 6. DNS + Thread Pool Saturation
+
+### ⚠️ Problem
+
+- `dns.lookup` uses **libuv thread pool**
+    
+- Default pool size = **4**
+    
+- Heavy usage → queue → delays
+    
+
+### ✅ Fix 1 — Use c-ares (non-thread pool)
+
+```js
+const dns = require('dns').promises;
+
+const addresses = await dns.resolve4('example.com');
+```
+
+### ✅ Fix 2 — Increase thread pool
+
+```bash
+UV_THREADPOOL_SIZE=16 node server.js
+```
+
+---
+
+## 🔴 7. Regex Catastrophic Backtracking (ReDoS)
+
+### ❌ Problem
+
+```js
+const re = /^(a+)+$/;
+re.test('aaaaaaaaaaaaaaaaaaaab'); // exponential backtracking
+```
+
+### ✅ Fixes
+
+- Rewrite regex
+    
+- Use `safe-regex`
+    
+- Timeout / AbortSignal (Node 22+)
+    
+- Run in worker thread
+    
+
+---
+
+## 🧵 libuv Thread Pool — Key Facts
+
+|Property|Value|
+|---|---|
+|Default size|4|
+|Max size|1024|
+|Set via|UV_THREADPOOL_SIZE|
+|Used by|fs, crypto, dns.lookup, zlib|
+|NOT used by|network I/O (epoll/kqueue)|
+
+> ⚠️ Gotcha:  
+> If 4 threads are busy → next tasks WAIT (queue), even if event loop is free.
+
+---
+
+## 📊 Monitoring Event Loop Lag
+
+### ✅ Manual Detection
+
+```js
+let lastCheck = Date.now();
+
 setInterval(() => {
-  console.log('Mean loop delay:', h.mean / 1e6, 'ms');
+  const now = Date.now();
+  const lag = now - lastCheck - 1000;
+
+  if (lag > 100) {
+    console.warn(`Event loop lag: ${lag}ms`);
+  }
+
+  lastCheck = now;
 }, 1000);
 ```
 
-### ⚠️ Common Mistakes
-- Using `fs.readFileSync` in request handlers — fine in startup, terrible in hot paths
-- Running `JSON.parse` on MB-sized payloads in a tight loop
-- Not profiling before optimizing — measure first
+### ✅ perf_hooks (Best)
 
-### 🎯 Interview Tip
-> "I profile with `clinic.js` or `--inspect` to find blocking operations. For CPU-heavy tasks, I use `worker_threads`. For chunked processing, I yield with `setImmediate` to let I/O through."
+```js
+const { monitorEventLoopDelay } = require('perf_hooks');
 
+const h = monitorEventLoopDelay({ resolution: 20 });
+h.enable();
+
+setInterval(() => {
+  console.log('p50 lag:', h.percentile(50) / 1e6, 'ms');
+  console.log('p99 lag:', h.percentile(99) / 1e6, 'ms');
+  h.reset();
+}, 5000);
+```
+
+### ✅ Production Tools
+
+- clinic.js → `clinic doctor -- node server.js`
+    
+- 0x → flamegraphs
+    
+- Node flag → `--prof`
+    
+
+---
+
+## 🧠 Quick Interview Summary
+
+👉 Event loop blocks when:
+
+- CPU-heavy sync code
+    
+- Sync APIs (fs, crypto)
+    
+- Large JSON parsing
+    
+- nextTick recursion
+    
+- Thread pool saturation
+    
+- Bad regex (ReDoS)
+    
+
+👉 Solutions:
+
+- Worker Threads (CPU tasks)
+    
+- Async APIs (fs, crypto)
+    
+- Chunking (setImmediate)
+    
+- Streaming (large data)
+    
+- Increase thread pool
+    
+- Avoid nextTick abuse
+    
+
+---
+
+## ⚡ Golden Rule
+
+> ❌ NEVER block the event loop  
+> ✅ Always keep it **free to process callbacks**
+
+---
+## Q7 — Why might Node.js not be suitable for CPU-intensive tasks?
+
+👉 Node.js runs on a **single-threaded event loop**
+
+- One main thread handles:
+    
+    - incoming requests
+        
+    - callbacks
+        
+    - timers
+        
+    - promises
+        
+
+❗ If this thread is busy → **everything stops**
+
+---
+
+## 🔴 Problem: CPU-Intensive Tasks
+
+CPU-heavy operations:
+
+- large loops
+    
+- recursion (e.g., fibonacci)
+    
+- image/video processing
+    
+- data crunching
+    
+
+👉 These run **synchronously on main thread**
+
+---
+
+## ⚠️ What Goes Wrong?
+
+### 1. Event Loop Blocking
+
+```js
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+app.get('/heavy', (req, res) => {
+  const result = fibonacci(45); // ❌ blocks event loop
+  res.send(result);
+});
+```
+
+🚫 While this runs:
+
+- No other request is processed
+    
+- No I/O callbacks executed
+    
+- App becomes **unresponsive**
+    
+
+---
+
+### 2. No Parallelism by Default
+
+- Node.js uses **only one CPU core**
+    
+- Other cores remain unused
+    
+
+👉 Heavy task = full load on single core
+
+---
+
+### 3. Poor Scalability
+
+👉 One slow request can block thousands:
+
+- 1 CPU-heavy request  
+    ❌ blocks  
+    → 1000 fast API requests
+    
+
+---
+
+### 4. Thread Pool Misconception
+
+👉 libuv thread pool is **NOT for your JS logic**
+
+Used only for:
+
+- fs (file system)
+    
+- crypto
+    
+- dns.lookup
+    
+- zlib
+    
+
+❗ Your CPU-heavy JS code still runs on **main thread**
+
+---
+
+## 📉 Result
+
+- High latency
+    
+- Low throughput
+    
+- Bad user experience
+    
+- Server appears "frozen"
+    
+
+---
+
+## ✅ When Node.js is GOOD
+
+Best for:
+
+- I/O-heavy apps
+    
+- APIs
+    
+- real-time systems (chat, websockets)
+    
+- streaming
+    
+
+👉 Because it handles **non-blocking I/O efficiently**
+
+---
+
+## ✅ Solutions for CPU Tasks
+
+### ✔️ 1. Worker Threads (Best)
+
+```js
+const { Worker } = require('worker_threads');
+```
+
+- True parallelism
+    
+- Offload heavy computation
+    
+
+---
+
+### ✔️ 2. Break Work into Chunks
+
+```js
+setImmediate(() => { /* next chunk */ });
+```
+
+- Prevent long blocking
+    
+
+---
+
+### ✔️ 3. Microservices Architecture
+
+- Move heavy work to:
+    
+    - Python
+        
+    - Go
+        
+    - Java
+        
+
+---
+
+### ✔️ 4. Background Jobs / Queues
+
+- BullMQ
+    
+- RabbitMQ
+    
+- Kafka
+    
+
+---
+
+### ✔️ 5. Clustering
+
+```bash
+node cluster.js
+```
+
+- Use multiple processes (multi-core)
+    
+- Still not per-request parallelism
+    
+
+---
+
+## 🎯 Interview Answer (Perfect)
+
+> Node.js is not suitable for CPU-intensive tasks because it uses a single-threaded event loop. Heavy computations block the event loop, preventing it from handling other requests, which leads to poor performance and unresponsiveness. Since it doesn’t utilize multiple CPU cores by default, CPU-heavy tasks should be offloaded to worker threads or external services.
+
+---
+
+## ⚡ Golden Rule
+
+> ❌ Never block the event loop  
+> ✅ Keep it free for handling requests
+
+---
 ---
 
 ## Q5 — What is the difference between microtasks and macrotasks?
