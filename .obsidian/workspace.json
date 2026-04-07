@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "f280c38809f90aa7",
+        "id": "6b23e0f94955afbb",
         "type": "tabs",
         "children": [
           {
-            "id": "3a4d892c60ed58f6",
+            "id": "b6c735e103793cf4",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Apply Tips/LinkedIn Smar Search.md",
+                "file": "Node JS/02_Core_Concepts.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "LinkedIn Smar Search"
+              "title": "02_Core_Concepts"
             }
           }
         ]
@@ -181,24 +181,30 @@
       "bases:Create new base": false
     }
   },
-  "active": "3a4d892c60ed58f6",
+  "active": "b6c735e103793cf4",
   "lastOpenFiles": [
-    "Apply Tips/Naukri Smart Search Setup.md",
+    "Node JS/03_Event_Loop_Deep_Dive.md",
+    "Node JS/05_Streams_and_FS.md",
+    "Node JS/04_Express_Backend.md",
+    "Node JS/redis with node.js.md",
+    "Node JS/microservices with node.js.md",
+    "Node JS/02_Core_Concepts.md",
     "Apply Tips/LinkedIn Smar Search.md",
+    "Apply Tips/Naukri Smart Search Setup.md",
+    "Untitled.canvas",
+    "Node JS/01_Basics.md",
+    "System Design/System Design Roadmap.md",
+    "Untitled.base",
+    "2026-04-03.md",
     "Node JS/check codeevoltion youtube channle.md",
     "Apply Tips",
     "Node JS/09_System_Design_Node.md",
     "Node JS/08_Database.md",
     "Node JS/07_Security_Auth.md",
     "Node JS/06_Scaling_Performance.md",
-    "Node JS/05_Streams_and_FS.md",
-    "Node JS/04_Express_Backend.md",
-    "Node JS/02_Core_Concepts.md",
-    "Node JS/03_Event_Loop_Deep_Dive.md",
     "Node JS/images/event_loop.png",
     "Node JS/images",
     "05 — Promises and Async Await Internals.md",
-    "Node JS/01_Basics.md",
     "Node JS/00_Revision_Tracker.md",
     "Node JS/Phase 0 - Prerequisites & Mindset.md",
     "Node JS/Phase 1 - Foundations.md",
@@ -208,13 +214,7 @@
     "System Design/Phase 6 - Real-World System Design Cases.md",
     "System Design/Phase 5 - High-Level Design Patterns.md",
     "System Design/Phase 4.5 - Critical Components Often Missed.md",
-    "System Design/Phase 4 - Distributed Systems Concepts.md",
-    "System Design/Phase 3 - Data & Storage Deep Dive.md",
-    "System Design/Phase 2.5 - LLD & SOLID Principles.md",
-    "2026-03-22.md",
-    "Untitled.canvas",
     "System Design",
-    "Untitled.base",
     "Node JS"
   ]
 }
