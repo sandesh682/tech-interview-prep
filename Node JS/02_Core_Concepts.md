@@ -524,15 +524,70 @@ for (const id of ids) {
 
 ---
 
-### ❌ Does NOT work as expected
+## ❌ Why `await` inside `forEach` doesn’t work
+
+### 🔹 Core Problem
+
+- `forEach` is **synchronous**
+    
+- It **does NOT wait** for async functions
+    
+- It **does NOT handle Promises**
+    
+
+---
+
+## 🧠 What Actually Happens
 
 ```js
-ids.forEach(async (id) => {
-  await getData(id); // ❌ not awaited properly
+const arr = [1, 2, 3];
+
+arr.forEach(async (num) => {
+  await new Promise(res => setTimeout(res, 1000));
+  console.log(num);
 });
+
+console.log("Done");
 ```
 
-👉 `forEach` does not wait
+### 👉 Output
+
+```
+Done
+1
+2
+3
+```
+
+### ⚠️ Explanation
+
+- `forEach` runs all iterations **instantly**
+    
+- Each async callback starts but is **not awaited**
+    
+- `"Done"` prints before async tasks finish
+    
+
+---
+
+## 🚫 Why `forEach` Fails with `await`
+
+- It doesn’t:
+    
+    - wait for `await`
+        
+    - return a Promise
+        
+    - collect async results
+        
+- It simply **loops and exits**
+    
+
+---
+
+## 🔥 Key Rule
+
+> Never use `await` inside `forEach` if you need control over execution
 
 ---
 
