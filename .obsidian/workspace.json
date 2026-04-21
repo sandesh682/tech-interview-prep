@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Node JS/06_Scaling_Performance.md",
-                "mode": "preview",
+                "file": "Node JS/07_Security_Auth.md",
+                "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "06_Scaling_Performance"
+              "title": "07_Security_Auth"
             }
           }
         ]
@@ -181,16 +181,18 @@
       "bases:Create new base": false
     }
   },
-  "active": "565a3a83d20ed4da",
+  "active": "c0a78ad14044109c",
   "lastOpenFiles": [
+    "Node JS/must know npm packages.md",
+    "Node JS/07_Security_Auth.md",
+    "Node JS/06_Scaling_Performance.md",
+    "Node JS/05_Streams_and_FS.md",
+    "Node JS/monitoring.md",
     "Node JS/microservices with node.js.md",
     "Node JS/02_Core_Concepts.md",
-    "Node JS/06_Scaling_Performance.md",
     "Node JS/03_Event_Loop_Deep_Dive.md",
     "Node JS/09_System_Design_Node.md",
     "Node JS/08_Database.md",
-    "Node JS/07_Security_Auth.md",
-    "Node JS/05_Streams_and_FS.md",
     "Node JS/04_Express_Backend.md",
     "Node JS/socket programming using node.js.md",
     "Node JS/redis with node.js.md",
@@ -212,8 +214,6 @@
     "Node JS/Phase 2 - Core Building Blocks.md",
     "System Design/Phase 0 - Prerequisites & Mindset.md",
     "System Design/Phase 1 - Foundations.md",
-    "System Design/Phase 6 - Real-World System Design Cases.md",
-    "System Design/Phase 5 - High-Level Design Patterns.md",
     "System Design",
     "Node JS"
   ]

