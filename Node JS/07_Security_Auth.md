@@ -1424,100 +1424,308 @@ res.clearCookie("token");
 > Secure setup = httpOnly + secure + sameSite + expiry
 
 ---
-## Q4 — What is OAuth 2.0 and how does it work with Node.js?
-
-### ✅ Simple Explanation
-OAuth 2.0 is an authorization framework that lets users grant third-party apps access to their resources without sharing passwords. You see it as "Login with Google/GitHub".
-
-### 🧠 Deep Dive
-**OAuth 2.0 Authorization Code Flow** (most secure, for server-side apps):
-```
-1. User clicks "Login with Google"
-2. App redirects to: accounts.google.com/oauth/authorize?client_id=...&redirect_uri=...&scope=email
-3. User approves → Google redirects back with: ?code=AUTH_CODE
-4. App exchanges code for tokens: POST /token with code + client_secret
-5. Google returns: { access_token, refresh_token, id_token }
-6. App verifies id_token, creates session
-```
-
-**Why not Implicit flow?** Access token in URL = logged in browser history/proxy logs. Deprecated.
-
-**PKCE (Proof Key for Code Exchange):** Adds `code_verifier` + `code_challenge` — prevents auth code interception. Required for SPAs and mobile apps.
-
-### 💻 Code Example
-```js
-// Using Passport.js with Google OAuth
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: '/auth/google/callback',
-  scope: ['email', 'profile'],
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    // Find or create user
-    let user = await User.findOne({ googleId: profile.id });
-    if (!user) {
-      user = await User.create({
-        googleId: profile.id,
-        email: profile.emails[0].value,
-        name: profile.displayName,
-      });
-    }
-    done(null, user);
-  } catch (err) {
-    done(err);
-  }
-}));
-
-app.get('/auth/google', passport.authenticate('google'));
-
-app.get('/auth/google/callback',
-  passport.authenticate('google', { session: false }),
-  (req, res) => {
-    const tokens = generateTokens(req.user._id);
-    // Set refresh token in cookie, send access token
-    res.cookie('refreshToken', tokens.refreshToken, { httpOnly: true, secure: true });
-    res.redirect(`${process.env.CLIENT_URL}?token=${tokens.accessToken}`);
-  }
-);
-
-// Manual OAuth flow (without Passport)
-app.get('/auth/github', (req, res) => {
-  const state = crypto.randomBytes(16).toString('hex');
-  req.session.oauthState = state;
-  
-  const url = new URL('https://github.com/login/oauth/authorize');
-  url.searchParams.set('client_id', process.env.GITHUB_CLIENT_ID);
-  url.searchParams.set('redirect_uri', process.env.GITHUB_CALLBACK_URL);
-  url.searchParams.set('scope', 'user:email');
-  url.searchParams.set('state', state); // CSRF protection
-  
-  res.redirect(url.toString());
-});
-```
-
-### ⚠️ Common Mistakes
-- Not verifying `state` parameter on callback — enables CSRF on OAuth flow
-- Storing `access_token` in your DB without encryption
-- Forgetting to validate the `id_token` (JWT) signature from the provider
-
-### 🎯 Interview Tip
-> "I always validate the `state` parameter on the OAuth callback to prevent CSRF attacks. For production, I use Passport.js with a session-less JWT approach — no server-side sessions."
+## Q5 — OAuth 2.0 + OpenID Connect + Roles (Complete Auth Guide)
 
 ---
 
-## ⚡ Quick Revision Summary
+## 🧠 Big Picture
 
-- JWT = Header.Payload.Signature; stateless; access (15min) + refresh (7d) pattern
-- Refresh tokens in httpOnly cookies; access tokens in memory (not localStorage)
-- JWT revocation requires blacklist in Redis (stateless otherwise)
-- OWASP: Broken Access Control #1; NoSQL injection, crypto failures, misconfiguration
-- `helmet` → security headers; `express-mongo-sanitize` → NoSQL injection; `bcrypt` → passwords
-- Rate limit login, password reset, and OTP endpoints
-- OAuth 2.0 Authorization Code Flow; validate `state` param; use PKCE for SPAs
+> **OAuth 2.0 = Authorization (access)**  
+> **OIDC = Authentication (identity)**  
+> **Your Backend = Roles & Permissions (authorization logic)**
+
+---
+
+## 🔐 What is OAuth 2.0?
+
+**OAuth 2.0 allows your application (a third-party) to access a user’s data from another service (like Google), with the user’s permission, without requiring the user to share their password.**
+
+- It works by using **tokens (issued by the provider like Google)** to securely access APIs.
+
+👉 Example: _Login with Google_
+
+---
+
+## 🎯 Purpose of OAuth 2.0
+
+- Grant limited access to APIs
+    
+- Delegate permissions securely
+    
+
+---
+
+## 🔑 Access Token
+
+- Used to call APIs:
+    
+
+```http
+Authorization: Bearer <access_token>
+```
+
+- Represents:
+    
+    - “User allowed this app to access data”
+        
+
+---
+
+## ⚠️ Problem with OAuth 2.0 Alone
+
+- ❌ No standard way to identify user
+    
+- ❌ Access token format varies (opaque/JWT)
+    
+- ❌ No guaranteed user info
+    
+
+👉 So you **cannot reliably authenticate user**
+
+---
+
+## 🆔 Why OpenID Connect (OIDC) is Required
+
+- OIDC = **Authentication layer on top of OAuth 2.0**
+    
+- Adds **ID Token (JWT)**
+    
+
+---
+
+## 🔑 ID Token (Most Important)
+
+Contains identity:
+
+```json
+{
+  "sub": "123",
+  "email": "user@gmail.com",
+  "name": "Sandesh"
+}
+```
+
+✔️ Standardized  
+✔️ Signed (can verify)  
+✔️ Reliable identity
+
+---
+
+## 🧩 OAuth vs OIDC
+
+|Feature|OAuth 2.0|OIDC|
+|---|---|---|
+|Purpose|Authorization|Authentication|
+|Token|Access Token|ID Token|
+|Identity|❌|✅|
+|Standard User Info|❌|✅|
+
+---
+
+## 🔁 Complete Flow (Best Practice)
+
+1. User clicks login (Google)
+    
+2. Redirect to provider
+    
+3. User logs in + consents
+    
+4. Backend receives **code**
+    
+5. Exchange code → get:
+    
+    - Access Token
+        
+    - **ID Token**
+        
+6. Verify ID Token
+    
+7. Extract user identity
+    
+8. Check/Create user in DB
+    
+9. Assign role
+    
+10. Issue your own JWT
+    
+
+---
+
+## 🏗️ Role Management (Critical Concept)
+
+### ❗ Truth
+
+> Google does NOT know your roles
+
+---
+
+## 🗄️ Roles Stored in Your DB
+
+```json
+{
+  "email": "user@gmail.com",
+  "role": "admin"
+}
+```
+
+---
+
+## 🔁 Role Assignment Flow
+
+### Existing User
+
+```js
+const user = await User.findOne({ email });
+// role already exists
+```
+
+---
+
+### New User
+
+```js
+const user = await User.create({
+  email,
+  role: "user" // default role
+});
+```
+
+---
+
+## 🔐 Your JWT (Final Step)
+
+```json
+{
+  "userId": "123",
+  "role": "admin"
+}
+```
+
+✔️ This is what your backend trusts
+
+---
+
+## 🔒 Authorization in Your App
+
+### Middleware Example
+
+```js
+function authorize(role) {
+  return (req, res, next) => {
+    if (req.user.role !== role) {
+      return res.status(403).send("Forbidden");
+    }
+    next();
+  };
+}
+```
+
+---
+
+## 🧠 Responsibility Split
+
+|System|Responsibility|
+|---|---|
+|Google (OAuth/OIDC)|Identity (who user is)|
+|Your Backend|Roles & Permissions|
+|Your JWT|Session + Authorization|
+
+---
+
+## ⚠️ Common Misconceptions
+
+- ❌ Access token contains roles
+    
+- ❌ OAuth = Authentication
+    
+- ❌ Google manages your permissions
+    
+
+---
+
+## 🧩 Advanced Concepts (Interview Level)
+
+### 🟢 RBAC (Role-Based Access Control)
+
+- Roles: admin, user
+    
+- Simple and common
+    
+
+---
+
+### 🔵 ABAC (Attribute-Based Access Control)
+
+- Based on:
+    
+    - user attributes
+        
+    - resource
+        
+    - conditions
+        
+- Example:
+    
+
+```js
+if (user.department === "HR") allow();
+```
+
+---
+
+### 🟡 Token Strategy
+
+- Access Token → short-lived
+    
+- Refresh Token → long-lived
+    
+- Your JWT → session management
+    
+
+---
+
+## 🚀 Real-World Architecture (Your Setup)
+
+```text
+Google (OIDC)
+      ↓
+ID Token (identity)
+      ↓
+Your Backend
+      ↓
+DB (user + role)
+      ↓
+Your JWT (role inside)
+      ↓
+Protected APIs
+```
+
+---
+
+## 🧠 Final Mental Model
+
+> OAuth → “What can I access?”  
+> OIDC → “Who am I?”  
+> Your Backend → “What am I allowed to do?”
+
+---
+
+## 📌 When to Use What
+
+- OAuth 2.0 → API access
+    
+- OIDC → Login / identity
+    
+- JWT (your own) → App sessions
+    
+- DB → Roles & permissions
+    
+
+---
+
+## 🔥 One-Line Summary
+
+> **Google authenticates the user, your system authorizes the user**
 
 ---
 
