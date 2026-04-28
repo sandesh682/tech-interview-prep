@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Node JS/10_Microservices-NodeJS.md",
+                "file": "DSA/01_Binary_Tree.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "10_Microservices-NodeJS"
+              "title": "01_Binary_Tree"
             }
           }
         ]
@@ -183,8 +183,10 @@
   },
   "active": "565a3a83d20ed4da",
   "lastOpenFiles": [
-    "Node JS/11_gRPC_NodeJS_Notes.md",
     "Node JS/10_Microservices-NodeJS.md",
+    "DSA/01_Binary_Tree.md",
+    "DSA",
+    "Node JS/11_gRPC_NodeJS_Notes.md",
     "Node JS/07_Security_Auth.md",
     "Node JS/Microservices.md",
     "Node JS/auth-mastery.md",
@@ -214,7 +216,6 @@
     "05 — Promises and Async Await Internals.md",
     "Node JS/00_Revision_Tracker.md",
     "Node JS/Phase 0 - Prerequisites & Mindset.md",
-    "Node JS/Phase 1 - Foundations.md",
     "System Design",
     "Node JS"
   ]

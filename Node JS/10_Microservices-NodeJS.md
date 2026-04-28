@@ -3,7 +3,7 @@ tags: [system-design, microservices, nodejs, backend, interview-prep]
 created: 2026-04-22
 level: advanced
 ---
-##  Q1: What is Microservices Architecture?
+##  🧩Q1: What is Microservices Architecture?
 
 > [!important]
 > Microservices Architecture is a design approach where an application is built as a collection of small, independent services, each responsible for a specific business capability and communicating via APIs.
